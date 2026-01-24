@@ -1,0 +1,1 @@
+// This file is no longer used in the current layout and has been removed for a cleaner project structure.
