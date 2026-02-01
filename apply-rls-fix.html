@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apply RLS Recursion Fix</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .alert {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #856404;
+        }
+
+        .alert strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .step h3 {
+            color: #667eea;
+            margin-bottom: 10px;
+            font-size: 18px;
+        }
+
+        .step p {
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+
+        .sql-box {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            margin: 15px 0;
+            position: relative;
+        }
+
+        .copy-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #5568d3;
+            transform: translateY(-1px);
+        }
+
+        .copy-btn:active {
+            transform: translateY(0);
+        }
+
+        .copy-btn.copied {
+            background: #10b981;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-block;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .success {
+            background: #d1fae5;
+            border: 1px solid #10b981;
+            color: #065f46;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .keyword {
+            color: #569cd6;
+        }
+
+        .function {
+            color: #dcdcaa;
+        }
+
+        .string {
+            color: #ce9178;
+        }
+
+        .comment {
+            color: #6a9955;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>🔧 Apply RLS Recursion Fix</h1>
+        <p class="subtitle">Fix the infinite loading issue in the Owner Portal</p>
+
+        <div class="alert">
+            <strong>⚠️ Critical Database Fix Required</strong>
+            Your database has an infinite recursion bug in the RLS helper functions. This is preventing the Owner Portal
+            from loading. Follow the steps below to fix it.
+        </div>
+
+        <div class="step">
+            <h3>Step 1: Copy the SQL Migration</h3>
+            <p>Click the "Copy SQL" button below to copy the migration to your clipboard:</p>
+
+            <div class="sql-box">
+                <button class="copy-btn" onclick="copySql()">Copy SQL</button>
+                <pre id="sql-content"><span class="comment">-- Fix infinite recursion in get_user_org_id() and user_has_role()</span>
+<span class="comment">-- These functions were causing RLS policy evaluation loops</span>
+
+<span class="comment">-- Drop existing functions</span>
+<span class="keyword">DROP FUNCTION IF EXISTS</span> <span class="function">get_user_org_id</span>();
+<span class="keyword">DROP FUNCTION IF EXISTS</span> <span class="function">user_has_role</span>(user_role);
+
+<span class="comment">-- Recreate with proper search_path to prevent RLS recursion</span>
+<span class="keyword">CREATE OR REPLACE FUNCTION</span> <span class="function">get_user_org_id</span>()
+<span class="keyword">RETURNS</span> UUID <span class="keyword">AS</span> $$
+  <span class="keyword">SELECT</span> org_id <span class="keyword">FROM</span> public.profiles <span class="keyword">WHERE</span> user_id = auth.uid();
+$$ <span class="keyword">LANGUAGE</span> sql <span class="keyword">STABLE SECURITY DEFINER</span>
+<span class="keyword">SET</span> search_path = public, pg_temp;
+
+<span class="keyword">CREATE OR REPLACE FUNCTION</span> <span class="function">user_has_role</span>(required_role user_role)
+<span class="keyword">RETURNS</span> BOOLEAN <span class="keyword">AS</span> $$
+  <span class="keyword">SELECT EXISTS</span> (
+    <span class="keyword">SELECT</span> 1 <span class="keyword">FROM</span> public.profiles 
+    <span class="keyword">WHERE</span> user_id = auth.uid() 
+    <span class="keyword">AND</span> role = required_role
+  );
+$$ <span class="keyword">LANGUAGE</span> sql <span class="keyword">STABLE SECURITY DEFINER</span>
+<span class="keyword">SET</span> search_path = public, pg_temp;</pre>
+            </div>
+        </div>
+
+        <div class="step">
+            <h3>Step 2: Open Supabase SQL Editor</h3>
+            <p>Click the button below to open your Supabase SQL Editor in a new tab:</p>
+            <a href="https://supabase.com/dashboard/project/lcgckjfhlvuxnnjylzvk/sql/new" target="_blank"
+                class="btn-primary">
+                Open SQL Editor →
+            </a>
+        </div>
+
+        <div class="step">
+            <h3>Step 3: Paste and Run</h3>
+            <p>In the SQL Editor:</p>
+            <ol style="margin-left: 20px; color: #555; line-height: 1.8;">
+                <li>Paste the SQL you copied in Step 1</li>
+                <li>Click the <strong>"Run"</strong> button (or press Cmd+Enter)</li>
+                <li>Wait for the success message</li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>Step 4: Refresh Your App</h3>
+            <p>After the migration succeeds:</p>
+            <ol style="margin-left: 20px; color: #555; line-height: 1.8;">
+                <li>Go back to your app at <code>localhost:3000/owner</code></li>
+                <li>Hard refresh the browser (Cmd+Shift+R on Mac)</li>
+                <li>Clear browser storage if needed (DevTools → Application → Clear site data)</li>
+                <li>Log in again to the Owner Portal</li>
+            </ol>
+        </div>
+
+        <div class="success" id="success-message">
+            <strong>✅ Migration Applied!</strong><br>
+            Now refresh your browser and log in again. The Owner Portal should load successfully!
+        </div>
+    </div>
+
+    <script>
+        function copySql() {
+            const sqlContent = document.getElementById('sql-content').textContent;
+            const cleanSql = sqlContent
+                .replace(/<[^>]*>/g, '')  // Remove HTML tags
+                .trim();
+
+            navigator.clipboard.writeText(cleanSql).then(() => {
+                const btn = document.querySelector('.copy-btn');
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            });
+        }
+
+        // Show success message when user comes back from Supabase
+        window.addEventListener('focus', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('success') === 'true') {
+                document.getElementById('success-message').classList.add('show');
+            }
+        });
+    </script>
+</body>
+
+</html>

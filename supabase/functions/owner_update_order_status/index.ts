@@ -8,9 +8,8 @@ const corsHeaders = {
 
 // State machine: valid transitions
 const VALID_TRANSITIONS: Record<string, string[]> = {
-    'awaiting_payment': ['paid', 'canceled'],
-    'paid': ['accepted', 'canceled'],
-    'accepted': ['preparing'],
+    'awaiting_payment': ['incoming', 'canceled'],
+    'incoming': ['preparing', 'canceled'], // Owner accepts and starts prep
     'preparing': ['ready'],
     'ready': ['completed', 'out_for_delivery'],
     'out_for_delivery': ['completed'],
@@ -133,6 +132,8 @@ serve(async (req) => {
         const timestamp = new Date().toISOString()
         if (new_status === 'accepted') {
             updateData.accepted_at = timestamp
+        } else if (new_status === 'ready') {
+            updateData.ready_at = timestamp
         } else if (new_status === 'completed') {
             updateData.completed_at = timestamp
         } else if (new_status === 'canceled') {
@@ -151,6 +152,17 @@ serve(async (req) => {
             throw updateError
         }
 
+        // Create log event
+        await supabaseAdmin
+            .from('order_events')
+            .insert({
+                order_id: order_id,
+                previous_status: currentStatus,
+                new_status: new_status,
+                changed_by: user.id,
+                metadata: { source: 'owner_portal' }
+            })
+
         // Create notification
         await supabaseAdmin
             .from('notifications')
@@ -166,8 +178,93 @@ serve(async (req) => {
                 },
             })
 
-        // TODO: Send customer notification (email/SMS)
-        // TODO: Trigger realtime broadcast
+        if (new_status === 'ready') {
+            try {
+                // Handle Pickup Notification
+                if (order.fulfillment_type === 'pickup' && order.customer_email) {
+                    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+                    if (resendApiKey) {
+                        const trackingUrl = `${req.headers.get('origin') || 'http://localhost:3000'}/order/${updatedOrder.public_token}`;
+
+                        await fetch('https://api.resend.com/emails', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${resendApiKey}`,
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                from: 'Lumière Dining <orders@lumiere.dining>',
+                                to: [order.customer_email],
+                                subject: `Your order #${updatedOrder.order_number.toString().padStart(4, '0')} is ready!`,
+                                html: `
+                                    <h1>Order Ready!</h1>
+                                    <p>Hi ${order.customer_name},</p>
+                                    <p>Your order is ready for pickup.</p>
+                                    <p><a href="${trackingUrl}">Track your order status</a></p>
+                                `
+                            }),
+                        });
+                        console.log(`📧 Sent readiness email to ${order.customer_email}`);
+                    }
+                }
+                // Handle Delivery Logic (Uber Direct)
+                else if (order.fulfillment_type === 'delivery') {
+                    // Start automated dispatch if not already dispatched
+                    // We check idempotency briefly here, but the called function should also handle it.
+                    // Actually, let's just call it.
+                    console.log('🚚 Order ready for delivery - triggering Uber Direct...');
+
+                    const functionsUrl = Deno.env.get('SUPABASE_URL')
+                        ? `${Deno.env.get('SUPABASE_URL')}/functions/v1/uber_create_delivery`
+                        : 'http://localhost:54321/functions/v1/uber_create_delivery'; // Fallback for local
+
+                    // Fire and wait - we want to report error if it fails
+                    const uberRes = await fetch(functionsUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': authHeader // Pass through the user's token
+                        },
+                        body: JSON.stringify({ order_id: order_id })
+                    });
+
+                    if (!uberRes.ok) {
+                        const uberErr = await uberRes.json().catch(() => ({}));
+                        console.error('❌ Auto-dispatch failed:', uberErr);
+                        // Return this error to the UI so we can show "Ready but dispatch failed"
+                        return new Response(
+                            JSON.stringify({
+                                success: true,
+                                order: updatedOrder,
+                                warning: `Order marked Ready, but Uber dispatch failed: ${uberErr.error || uberRes.statusText}`,
+                                uber_dispatch_failed: true
+                            }),
+                            {
+                                status: 200,
+                                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                            }
+                        )
+                    } else {
+                        const uberData = await uberRes.json();
+                        console.log('✅ Auto-dispatch success:', uberData);
+                        return new Response(
+                            JSON.stringify({
+                                success: true,
+                                order: updatedOrder,
+                                uber_delivery: uberData.delivery
+                            }),
+                            {
+                                status: 200,
+                                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                            }
+                        )
+                    }
+                }
+            } catch (err) {
+                console.error('❌ Failed to process post-update actions:', err);
+                // Don't fail the request just because notification/dispatch failed
+            }
+        }
 
         return new Response(
             JSON.stringify({
