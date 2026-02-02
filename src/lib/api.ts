@@ -614,15 +614,12 @@ export async function updatePromo(promoId: string, updates: Partial<CreatePromoP
     });
     return response.promo_code;
 }
-
-
-// ============================================
 // PUBLIC API (STREETFLOW)
 // ============================================
 
 export async function publicCreatePaymentIntent(data: any) {
     // Add cache-busting for iOS Safari
-    const url = new URL(`${EDGE_FUNCTION_URL}/create_checkout_session`);
+    const url = new URL(`${EDGE_FUNCTION_URL}/create-payment-intent`);
     url.searchParams.set('t', Date.now().toString());
     
     const response = await fetch(url.toString(), {
@@ -631,7 +628,7 @@ export async function publicCreatePaymentIntent(data: any) {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY
         },
-        body: JSON.stringify({ ...data, mode: 'payment_intent' }),
+        body: JSON.stringify({ ...data }),
         cache: 'no-store' // Prevent iOS caching
     });
     
@@ -694,7 +691,9 @@ export const api = {
 
     // Stripe Connect
     connectOnboarding: async (): Promise<{ url: string }> => {
-        return fetchWithAuth<{ url: string }>('connect_onboarding', { method: 'POST' });
+        // Ensure payout account exists, then request onboarding link
+        await fetchWithAuth('connect-create-account', { method: 'POST', body: {} });
+        return fetchWithAuth<{ url: string }>('connect-onboarding-link', { method: 'POST', body: {} });
     },
     // Used to refresh status after return
     connectRefresh: async (): Promise<any> => {

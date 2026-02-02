@@ -222,42 +222,48 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
             const initPayment = async () => {
                 setIsSubmitting(true);
                 try {
-                    // Generate idempotency key to prevent duplicate submissions
-                    const idempotencyKey = `checkout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    // Stable idempotency key per checkout attempt
+                    const storageKey = 'flavrr_checkout_idempotency_key';
+                    let idempotencyKey = localStorage.getItem(storageKey);
+                    if (!idempotencyKey) {
+                        idempotencyKey = `checkout_${crypto.randomUUID()}`;
+                        localStorage.setItem(storageKey, idempotencyKey);
+                    }
                     
                     const res = await api.publicCreatePaymentIntent({
-                        org_slug: 'cafe-du-griot',
-                        cart: items.map(i => ({
-                            menu_item_id: i.id,
-                            quantity: i.quantity,
-                            modifiers: {},
-                            notes: null
+                        workspace_slug: organization?.slug || 'cafe-du-griot',
+                        idempotency_key: idempotencyKey,
+                        currency: 'cad',
+                        items: items.map(i => ({
+                            product_id: i.id,
+                            name: i.name[lang],
+                            unit_price_cents: Math.round(i.price * 100),
+                            qty: i.quantity
                         })),
                         customer: {
                             name: formData.name,
                             email: formData.email,
                             phone: formData.phone,
-                            marketing_opt_in: formData.marketing_opt_in
                         },
                         fulfillment: {
                             type: fulfillmentType,
-                            address: fulfillmentType === 'delivery' ? {
-                                street: formData.street,
-                                city: formData.city,
-                                postal_code: formData.postal,
-                                region: formData.region,
-                                country: formData.country,
-                                lat: formData.lat,
-                                lng: formData.lng
-                            } : undefined
+                            dropoff_address: fulfillmentType === 'delivery' ? `${formData.street}, ${formData.city}, ${formData.region} ${formData.postal}, ${formData.country}` : undefined,
+                            dropoff_lat: fulfillmentType === 'delivery' ? formData.lat : undefined,
+                            dropoff_lng: fulfillmentType === 'delivery' ? formData.lng : undefined,
+                            notes: formData.instructions
                         },
-                        notes: formData.instructions,
-                        idempotency_key: idempotencyKey
+                        totals: {
+                            subtotal_cents: Math.round(cartTotal * 100),
+                            delivery_fee_cents: Math.round(deliveryFee * 100),
+                            service_fee_cents: 0,
+                            tax_cents: Math.round(tax * 100),
+                            total_cents: Math.round(total * 100),
+                        }
                     });
 
-                    if (res.clientSecret) {
-                        setClientSecret(res.clientSecret);
-                        setOrderToken(res.public_token); // Store token for success screen
+                    if (res.client_secret) {
+                        setClientSecret(res.client_secret);
+                        setOrderToken(res.order_id);
                     }
                 } catch (err: any) {
                     console.error('Failed to init payment', err);

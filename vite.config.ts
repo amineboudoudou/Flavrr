@@ -10,6 +10,9 @@ const PROJECT_ROOT = fs.realpathSync(path.resolve(__dirname));
 const SRC_ROOT = path.join(PROJECT_ROOT, 'src');
 const SRC_ROOT_POSIX = SRC_ROOT.split(path.sep).join('/');
 
+const DEFAULT_PORT = 5173;
+const PORT = Number(process.env.PORT ?? process.env.VITE_PORT ?? DEFAULT_PORT);
+
 const WATCH_IGNORE_SEGMENTS = [
   '.git',
   'node_modules',
@@ -149,11 +152,10 @@ export default defineConfig(({ mode }) => {
   return {
     server: {
       host: '127.0.0.1',
-      port: 5173,
-      strictPort: true,
+      port: PORT,
+      strictPort: false,
       hmr: {
         host: '127.0.0.1',
-        port: 5173,
         protocol: 'ws',
       },
       fs: {

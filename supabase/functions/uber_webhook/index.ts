@@ -5,11 +5,11 @@ const webhookSecret = Deno.env.get('UBER_DIRECT_WEBHOOK_SECRET') ?? ''
 
 // Map Uber status to our delivery status
 const STATUS_MAPPING: Record<string, string> = {
-    'pending': 'created',
-    'pickup': 'courier_assigned',
-    'pickup_complete': 'picked_up',
-    'dropoff': 'picked_up',
-    'delivered': 'dropped_off',
+    'pending': 'delivery_requested',
+    'pickup': 'pickup',
+    'pickup_complete': 'dropoff',
+    'dropoff': 'dropoff',
+    'delivered': 'delivered',
     'canceled': 'canceled',
     'returned': 'failed',
 }
@@ -42,7 +42,7 @@ serve(async (req) => {
         const { data: delivery, error: deliveryError } = await supabaseAdmin
             .from('deliveries')
             .select('id, order_id, status')
-            .eq('external_id', deliveryId)
+            .eq('uber_delivery_id', deliveryId)
             .single()
 
         if (deliveryError || !delivery) {
@@ -56,12 +56,6 @@ serve(async (req) => {
         // Update delivery record
         const updateData: Record<string, any> = {
             status: newStatus,
-            raw_response: body,
-        }
-
-        if (body.courier) {
-            updateData.pickup_eta = body.pickup?.eta
-            updateData.dropoff_eta = body.dropoff?.eta
         }
 
         const { error: updateError } = await supabaseAdmin
@@ -75,71 +69,22 @@ serve(async (req) => {
 
         // Update order status based on delivery status
         let orderStatus: string | null = null
-        if (newStatus === 'picked_up') {
+        if (newStatus === 'pickup' || newStatus === 'dropoff') {
             orderStatus = 'out_for_delivery'
-        } else if (newStatus === 'dropped_off') {
-            orderStatus = 'completed'
+        } else if (newStatus === 'delivered') {
+            orderStatus = 'delivered'
         }
 
         if (orderStatus) {
-            const orderUpdateData: Record<string, any> = {
-                status: orderStatus,
-                uber_status: status,
-                last_uber_sync_at: new Date().toISOString()
+            const orderUpdateData: Record<string, any> = { status: orderStatus }
+            if (orderStatus === 'delivered') {
+                orderUpdateData.delivered_at = new Date().toISOString()
             }
-
-            if (orderStatus === 'completed') {
-                orderUpdateData.completed_at = new Date().toISOString()
-            }
-
-            // Get current order status for logging
-            const { data: currentOrder } = await supabaseAdmin
-                .from('orders')
-                .select('status')
-                .eq('id', delivery.order_id)
-                .single()
 
             await supabaseAdmin
                 .from('orders')
                 .update(orderUpdateData)
                 .eq('id', delivery.order_id)
-
-            // Log the status change
-            await supabaseAdmin
-                .from('order_events')
-                .insert({
-                    order_id: delivery.order_id,
-                    previous_status: currentOrder?.status || 'ready',
-                    new_status: orderStatus,
-                    changed_by: 'system_uber_webhook',
-                    metadata: {
-                        delivery_status: newStatus,
-                        uber_status: status,
-                        event_type: eventType
-                    }
-                })
-        }
-
-        // Create notification
-        const { data: order } = await supabaseAdmin
-            .from('orders')
-            .select('org_id')
-            .eq('id', delivery.order_id)
-            .single()
-
-        if (order) {
-            await supabaseAdmin
-                .from('notifications')
-                .insert({
-                    org_id: order.org_id,
-                    user_id: null,
-                    type: 'delivery_update',
-                    payload: {
-                        order_id: delivery.order_id,
-                        delivery_status: newStatus,
-                        event_type: eventType,
-                    },
-                })
         }
 
         console.log(`Delivery ${deliveryId} updated to status: ${newStatus}`)
