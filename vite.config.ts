@@ -156,6 +156,7 @@ export default defineConfig(({ mode }) => {
       strictPort: false,
       hmr: {
         host: '127.0.0.1',
+        port: PORT,
         protocol: 'ws',
       },
       fs: {

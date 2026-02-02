@@ -14,6 +14,12 @@ const STATUS_MAPPING: Record<string, string> = {
     'returned': 'failed',
 }
 
+async function sha256Hex(input: string): Promise<string> {
+    const data = new TextEncoder().encode(input)
+    const hash = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 serve(async (req) => {
     try {
         // Verify webhook (if Uber provides signature)
@@ -36,6 +42,34 @@ serve(async (req) => {
         if (!deliveryId) {
             console.error('No delivery_id in webhook payload')
             return new Response(JSON.stringify({ error: 'No delivery_id' }), { status: 400 })
+        }
+
+        // IDEMPOTENCY: Insert event first, no-op on replay
+        const rawEventId = body.event_id || body.eventId || body.id || null
+        const rawTimestamp = body.timestamp || body.created_at || body.createdAt || ''
+        const deterministicEventId = rawEventId
+            ? `uber_${rawEventId}`
+            : `uber_${await sha256Hex(`${deliveryId}|${status}|${rawTimestamp}`)}`
+
+        const { error: uberEventInsertError } = await supabaseAdmin
+            .from('uber_events')
+            .insert({
+                event_id: deterministicEventId,
+                delivery_id: deliveryId,
+                type: eventType,
+                payload: body,
+                processing_result: 'processing'
+            })
+
+        if (uberEventInsertError) {
+            if ((uberEventInsertError as any).code === '23505') {
+                console.log('Uber event already processed:', deterministicEventId)
+                return new Response(JSON.stringify({ received: true, already_processed: true }), {
+                    headers: { 'Content-Type': 'application/json' },
+                    status: 200,
+                })
+            }
+            throw uberEventInsertError
         }
 
         // Fetch delivery from database
@@ -88,6 +122,11 @@ serve(async (req) => {
         }
 
         console.log(`Delivery ${deliveryId} updated to status: ${newStatus}`)
+
+        await supabaseAdmin
+            .from('uber_events')
+            .update({ processing_result: 'success' })
+            .eq('event_id', deterministicEventId)
 
         return new Response(JSON.stringify({ received: true }), {
             headers: { 'Content-Type': 'application/json' },

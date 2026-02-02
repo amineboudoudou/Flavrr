@@ -10,270 +10,226 @@ const corsHeaders = {
 const UBER_API_BASE = 'https://api.uber.com/v1/customers'
 const UBER_CUSTOMER_ID = Deno.env.get('UBER_CUSTOMER_ID') ?? Deno.env.get('UBER_DIRECT_CUSTOMER_ID')
 
+function getServiceRoleHeader(req: Request) {
+    return req.headers.get('X-Service-Role-Key')
+}
+
+async function sha256Hex(input: string): Promise<string> {
+    const data = new TextEncoder().encode(input)
+    const hash = await crypto.subtle.digest('SHA-256', data)
+    return Array.from(new Uint8Array(hash)).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
 
     try {
-        // 1. Verify Authentication
         const authHeader = req.headers.get('Authorization')
-        if (!authHeader) {
-            throw new Error('Missing authorization header')
+        const serviceRoleHeader = getServiceRoleHeader(req)
+
+        const hasServiceRole = !!serviceRoleHeader && serviceRoleHeader === (Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '')
+
+        // If not internal call, require a real user JWT
+        if (!hasServiceRole && !authHeader) {
+            return new Response(JSON.stringify({ error: 'Missing authorization' }), {
+                status: 401,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            })
         }
-
-        const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-            { global: { headers: { Authorization: authHeader } } }
-        )
-
-        const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
-        if (userError || !user) throw new Error('Unauthorized')
-
-        // 2. Parse Request
-        const { order_id } = await req.json()
-        if (!order_id) throw new Error('Missing order_id')
 
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // 3. Fetch Order & Org
+        const { order_id, quote_id } = await req.json()
+        if (!order_id) throw new Error('Missing order_id')
+
+        // Fetch order (workspace-scoped)
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select(`
-                *,
-                organizations (
-                    name, street, city, region, postal_code, country, phone, settings
-                )
-            `)
+            .select('id, workspace_id, status, delivery_address, delivery_fee_cents')
             .eq('id', order_id)
             .single()
 
         if (orderError || !order) throw new Error('Order not found')
 
-        // 4. Validate Delivery Eligibility
-        if (order.fulfillment_type !== 'delivery') {
-            throw new Error('Order is not for delivery')
+        if (!order.delivery_address) {
+            throw new Error('Order has no delivery_address')
         }
 
-        const org = order.organizations
+        // If called by a user, verify they are workspace owner/admin
+        if (!hasServiceRole && authHeader) {
+            const supabaseClient = createClient(
+                Deno.env.get('SUPABASE_URL') ?? '',
+                Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+                { global: { headers: { Authorization: authHeader } } }
+            )
 
-        // STRICT VALIDATION: Seller settings are the single source of truth
-        const missingFields = []
-        if (!org.name) missingFields.push('Restaurant Name')
-        if (!org.street) missingFields.push('Street Address')
-        if (!org.city) missingFields.push('City')
-        if (!org.region) missingFields.push('Province/Region')
-        if (!org.postal_code) missingFields.push('Postal Code')
-        if (!org.country) missingFields.push('Country')
-        if (!org.phone) missingFields.push('Phone Number')
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+            if (userError || !user) throw new Error('Unauthorized')
 
-        if (missingFields.length > 0) {
-            console.error('❌ Uber Delivery Blocked: Missing Seller Settings', missingFields)
-            throw new Error(`Restaurant address incomplete. Please complete Settings before requesting delivery. Missing: ${missingFields.join(', ')}`)
+            const { data: membership, error: membershipError } = await supabaseAdmin
+                .from('workspace_memberships')
+                .select('role')
+                .eq('workspace_id', order.workspace_id)
+                .eq('user_id', user.id)
+                .single()
+
+            if (membershipError || !membership || !['owner', 'admin'].includes(membership.role)) {
+                throw new Error('Forbidden')
+            }
         }
 
-        // User check (for delivery)
-        const deliveryAddress = order.delivery_address as any
-        if (!deliveryAddress?.street) throw new Error('Delivery address missing')
-
-        // 5. Environment Check & Auth
+        // Safety guard for local/test
         const uberEnv = Deno.env.get('UBER_ENV')
         if (uberEnv !== 'test') {
             throw new Error('Safety Guard: UBER_ENV is not set to "test". Delivery creation blocked.')
         }
 
-        // 6. IDEMPOTENCY CHECK: Prevent duplicate deliveries
-        const { data: existingDelivery, error: deliveryCheckError } = await supabaseAdmin
+        // IDEMPOTENCY: one delivery per order
+        const { data: existingDelivery } = await supabaseAdmin
             .from('deliveries')
-            .select('id, external_id, status, eta_minutes, tracking_url')
+            .select('id, uber_delivery_id, status, tracking_url')
             .eq('order_id', order_id)
+            .maybeSingle()
+
+        if (existingDelivery?.id) {
+            return new Response(JSON.stringify({
+                success: true,
+                delivery_id: existingDelivery.id,
+                uber_delivery_id: existingDelivery.uber_delivery_id,
+                status: existingDelivery.status,
+                tracking_url: existingDelivery.tracking_url,
+                already_exists: true,
+            }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+        }
+
+        // Reserve delivery row first (DB-level idempotency_key)
+        const { data: reservedDelivery, error: reserveError } = await supabaseAdmin
+            .from('deliveries')
+            .insert({
+                order_id: order_id,
+                workspace_id: order.workspace_id,
+                idempotency_key: order_id,
+                quote_id: quote_id || null,
+                status: 'delivery_requested',
+                customer_delivery_fee_cents: order.delivery_fee_cents || 0,
+                uber_cost_cents: 0,
+                dropoff_address: order.delivery_address,
+            })
+            .select('id')
             .single()
 
-        if (existingDelivery) {
-            console.log('✅ Delivery already exists for this order:', existingDelivery.id)
-            return new Response(
-                JSON.stringify({
+        if (reserveError || !reservedDelivery) {
+            if ((reserveError as any)?.code === '23505') {
+                const { data: conflictedDelivery, error: conflictFetchError } = await supabaseAdmin
+                    .from('deliveries')
+                    .select('id, uber_delivery_id, status, tracking_url')
+                    .eq('idempotency_key', order_id)
+                    .single()
+
+                if (conflictFetchError || !conflictedDelivery) throw new Error('Delivery idempotency conflict')
+
+                return new Response(JSON.stringify({
                     success: true,
-                    delivery_id: existingDelivery.id,
-                    external_id: existingDelivery.external_id,
-                    status: existingDelivery.status,
-                    eta_minutes: existingDelivery.eta_minutes,
-                    tracking_url: existingDelivery.tracking_url,
-                    already_exists: true
-                }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            )
+                    delivery_id: conflictedDelivery.id,
+                    uber_delivery_id: conflictedDelivery.uber_delivery_id,
+                    status: conflictedDelivery.status,
+                    tracking_url: conflictedDelivery.tracking_url,
+                    already_exists: true,
+                }), {
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                })
+            }
+            throw new Error('Failed to reserve delivery')
         }
 
-        // 7. Access Token
         const accessToken = await getUberAccessToken()
 
-        // 8. Prepare Uber Payload
-        const prepTime = org.settings?.prep_time_default || 30
-        const pickupData = {
-            location: {
-                address: `${org.street}, ${org.city}, ${org.region} ${org.postal_code}, ${org.country}`,
-            },
-            contact: {
-                company_name: org.name,
-                phone: org.phone,
-            },
-            pickup_ready_time: new Date(Date.now() + prepTime * 60 * 1000).toISOString(),
-        }
+        const pickupAddressText = Deno.env.get('UBER_TEST_PICKUP_ADDRESS') || '123 Test St, Montreal, QC, CA'
+        const pickupPhone = Deno.env.get('UBER_TEST_PICKUP_PHONE') || '+15145550000'
 
-        const dropoffData = {
-            location: {
-                address: `${deliveryAddress.street}, ${deliveryAddress.city}, ${deliveryAddress.region} ${deliveryAddress.postal_code}, ${deliveryAddress.country || 'CA'}`,
-            },
-            contact: {
-                first_name: order.customer_name?.split(' ')[0] || 'Guest',
-                last_name: order.customer_name?.split(' ').slice(1).join(' ') || '',
-                phone: order.customer_phone || '',
-            },
-            special_instructions: deliveryAddress.instructions || 'Leave at door',
-        }
+        const dropoff = order.delivery_address as any
+        const dropoffAddressText = dropoff?.address || pickupAddressText
 
         const deliveryRequest = {
-            pickup_name: org.name,
-            pickup_address: JSON.stringify(pickupData.location),
-            pickup_phone_number: org.phone,
-            dropoff_name: order.customer_name,
-            dropoff_address: JSON.stringify(dropoffData.location),
-            dropoff_phone_number: order.customer_phone,
-            manifest_items: [{
-                name: "Food Order #" + order.order_number,
-                quantity: 1,
-                size: "medium",
-                dimensions: {
-                    length: 10,
-                    height: 10,
-                    depth: 10
-                }
-            }],
-            test_specifications: {
-                robo_courier_specification: {
-                    mode: "auto"
-                }
-            }
-        }
-
-        // Note: The payload above is a simplified version. The real Uber API /v1/customers/{customer_id}/deliveries 
-        // has a specific structure. I will use the structure from the existing code (which looked more correct)
-        // but ensure it matches the docs or standard practice. 
-        // Existing code used:
-        /*
-          pickup: { location: { address: ... }, contact: { ... }, ... },
-          dropoff: { location: { address: ... }, contact: { ... }, ... },
-          manifest: { description: ... }
-        */
-        // I will revert to that structure but keep the logic I added.
-
-        const realDeliveryRequest = {
             pickup: {
                 location: {
-                    address: `${org.street}, ${org.city}, ${org.region} ${org.postal_code}, ${org.country}`,
+                    address: pickupAddressText,
                 },
                 contact: {
-                    company_name: org.name,
-                    phone_number: org.phone,
+                    company_name: 'Flavrr',
+                    phone_number: pickupPhone,
                 },
             },
             dropoff: {
                 location: {
-                    address: `${deliveryAddress.street}, ${deliveryAddress.city}, ${deliveryAddress.region} ${deliveryAddress.postal_code}, ${deliveryAddress.country || 'CA'}`,
-                    ...(deliveryAddress.lat && deliveryAddress.lng ? {
-                        latitude: deliveryAddress.lat,
-                        longitude: deliveryAddress.lng
-                    } : {})
+                    address: dropoffAddressText,
+                    ...(dropoff?.lat && dropoff?.lng ? { latitude: dropoff.lat, longitude: dropoff.lng } : {}),
                 },
                 contact: {
-                    first_name: order.customer_name,
-                    phone_number: order.customer_phone || '',
+                    first_name: 'Customer',
+                    phone_number: pickupPhone,
                 },
-                instructions: deliveryAddress.instructions || '',
+                instructions: null,
             },
             manifest: {
-                description: `Order #${order.order_number}`,
+                description: `Order ${order_id}`,
             },
-            test_specifications: {
-                // For test environment to simulate valid flows
-            }
         }
-
-        console.log('🚚 Creating Uber Delivery (TEST MODE)...', JSON.stringify(realDeliveryRequest))
 
         const response = await fetch(`${UBER_API_BASE}/${UBER_CUSTOMER_ID}/deliveries`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${accessToken}`
+                'Authorization': `Bearer ${accessToken}`,
+                'Idempotency-Key': await sha256Hex(order_id),
             },
-            body: JSON.stringify(realDeliveryRequest)
+            body: JSON.stringify(deliveryRequest)
         })
 
         if (!response.ok) {
-            const err = await response.json()
+            const err = await response.json().catch(() => ({}))
             console.error('❌ Uber Create Delivery Error:', JSON.stringify(err))
-            throw new Error('Failed to create Uber delivery: ' + (err.message || response.statusText))
+
+            await supabaseAdmin
+                .from('deliveries')
+                .update({ status: 'failed' })
+                .eq('id', reservedDelivery.id)
+
+            throw new Error('Failed to create Uber delivery')
         }
 
         const deliveryData = await response.json()
-        console.log('✅ Delivery created:', deliveryData.id)
 
-        // 9. Save to deliveries table
-        const { data: deliveryRecord, error: deliveryInsertError } = await supabaseAdmin
+        const { error: finalizeError } = await supabaseAdmin
             .from('deliveries')
-            .insert({
-                order_id: order_id,
-                provider: 'uber_direct_test',
-                external_id: deliveryData.id,
-                status: deliveryData.status || 'created',
-                eta_minutes: deliveryData.dropoff_eta ? Math.round((new Date(deliveryData.dropoff_eta).getTime() - Date.now()) / 60000) : null,
-                tracking_url: deliveryData.tracking_url || null,
-                raw_response: deliveryData
-            })
-            .select()
-            .single()
-
-        if (deliveryInsertError) {
-            console.error('❌ Failed to insert delivery record:', deliveryInsertError)
-            throw new Error('Failed to save delivery record: ' + deliveryInsertError.message)
-        }
-
-        // 10. Link delivery to order and update status to ready
-        const { error: updateError } = await supabaseAdmin
-            .from('orders')
             .update({
-                delivery_id: deliveryRecord.id,
-                status: 'ready',
                 uber_delivery_id: deliveryData.id,
-                uber_tracking_url: deliveryData.tracking_url,
-                uber_status: deliveryData.status,
-                last_uber_sync_at: new Date().toISOString()
+                tracking_url: deliveryData.tracking_url || null,
+                status: deliveryData.status || 'delivery_requested',
+                pickup_address: { address: pickupAddressText },
             })
-            .eq('id', order_id)
+            .eq('id', reservedDelivery.id)
 
-        if (updateError) {
-            console.error('❌ Failed to update order with delivery info:', updateError)
-            throw new Error('Failed to link delivery to order: ' + updateError.message)
+        if (finalizeError) {
+            throw new Error('Failed to finalize delivery record')
         }
 
-        // 11. Return delivery info for frontend
-        return new Response(
-            JSON.stringify({ 
-                success: true, 
-                delivery_id: deliveryRecord.id,
-                external_id: deliveryData.id,
-                status: deliveryData.status,
-                eta_minutes: deliveryRecord.eta_minutes,
-                tracking_url: deliveryData.tracking_url
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
+        return new Response(JSON.stringify({
+            success: true,
+            delivery_id: reservedDelivery.id,
+            uber_delivery_id: deliveryData.id,
+            status: deliveryData.status || 'delivery_requested',
+            tracking_url: deliveryData.tracking_url || null,
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
 
     } catch (error) {
         console.error('🚨 Handler Error:', error)

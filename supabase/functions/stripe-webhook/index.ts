@@ -205,11 +205,11 @@ async function handlePaymentIntentSucceeded(event: Stripe.Event, supabase: any):
 
   // Trigger Uber delivery creation (idempotent)
   try {
-    await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/uber-create-delivery`, {
+    await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/uber_create_delivery`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${supabaseServiceKey}`,
+        'X-Service-Role-Key': supabaseServiceKey,
       },
       body: JSON.stringify({ order_id: orderId }),
     });
@@ -266,71 +266,92 @@ async function handleChargeRefunded(event: Stripe.Event, supabase: any): Promise
     return 'error:payment_not_found';
   }
 
-  // Get refund details
-  const refund = charge.refunds?.data?.[0];
-  if (!refund) {
+  // Refund details (can include multiple refunds over time)
+  const refunds = charge.refunds?.data || [];
+  if (refunds.length === 0) {
     console.error('No refund data in charge:', charge.id);
     return 'error:no_refund_data';
   }
 
-  // Check if refund already recorded
-  const { data: existingRefund } = await supabase
-    .from('refunds')
-    .select('id')
-    .eq('stripe_refund_id', refund.id)
-    .single();
+  let insertedAnyRefund = false;
 
-  if (existingRefund) {
-    console.log('Refund already recorded:', refund.id);
-    return 'success:already_recorded';
+  for (const refund of refunds) {
+    if (!refund?.id) continue;
+
+    // Insert refund row idempotently (stripe_refund_id is UNIQUE)
+    const { data: existingRefund } = await supabase
+      .from('refunds')
+      .select('id')
+      .eq('stripe_refund_id', refund.id)
+      .maybeSingle();
+
+    if (!existingRefund) {
+      const { error: refundError } = await supabase
+        .from('refunds')
+        .insert({
+          order_id: payment.order_id,
+          payment_id: payment.id,
+          stripe_refund_id: refund.id,
+          amount_cents: refund.amount,
+          reason: refund.reason || 'requested_by_customer',
+          status: refund.status === 'succeeded' ? 'succeeded' : 'pending',
+          succeeded_at: refund.status === 'succeeded' ? new Date().toISOString() : null,
+        });
+
+      if (refundError) {
+        // If unique violation, treat as idempotent success
+        if ((refundError as any).code !== '23505') {
+          console.error('Error creating refund:', refundError);
+          return 'error:refund_insert_failed';
+        }
+      } else {
+        insertedAnyRefund = true;
+      }
+    }
+
+    // Create ledger entry for this refund idempotently
+    const { data: existingLedger } = await supabase
+      .from('ledger_entries')
+      .select('id')
+      .eq('order_id', payment.order_id)
+      .eq('type', 'refund')
+      .contains('metadata', { stripe_refund_id: refund.id })
+      .maybeSingle();
+
+    if (!existingLedger) {
+      const { error: ledgerError } = await supabase
+        .from('ledger_entries')
+        .insert({
+          workspace_id: payment.workspace_id,
+          order_id: payment.order_id,
+          type: 'refund',
+          amount_cents: -refund.amount,
+          status: 'reversed',
+          description: `Refund: ${refund.reason || 'customer request'}`,
+          metadata: { stripe_refund_id: refund.id, stripe_charge_id: charge.id },
+        });
+
+      if (ledgerError) {
+        console.error('Error creating refund ledger entry:', ledgerError);
+      }
+    }
   }
 
-  // Create refund record
-  const { error: refundError } = await supabase
-    .from('refunds')
-    .insert({
-      order_id: payment.order_id,
-      payment_id: payment.id,
-      stripe_refund_id: refund.id,
-      amount_cents: refund.amount,
-      reason: refund.reason || 'requested_by_customer',
-      status: refund.status === 'succeeded' ? 'succeeded' : 'pending',
-      succeeded_at: refund.status === 'succeeded' ? new Date().toISOString() : null,
-    });
+  // Update order status: fully refunded => refunded, partial => keep as paid
+  const isFullyRefunded = (charge.amount_refunded || 0) >= (charge.amount || 0);
+  const nextStatus = isFullyRefunded ? 'refunded' : 'paid';
 
-  if (refundError) {
-    console.error('Error creating refund:', refundError);
-    return 'error:refund_insert_failed';
-  }
-
-  // Update order status
   const { error: orderError } = await supabase
     .from('orders')
-    .update({ status: 'refunded' })
+    .update({ status: nextStatus })
     .eq('id', payment.order_id);
 
   if (orderError) {
-    console.error('Error updating order to refunded:', orderError);
+    console.error('Error updating order refund status:', orderError);
   }
 
-  // Create ledger entry for refund
-  const { error: ledgerError } = await supabase
-    .from('ledger_entries')
-    .insert({
-      workspace_id: payment.workspace_id,
-      order_id: payment.order_id,
-      type: 'refund',
-      amount_cents: -refund.amount,
-      status: 'reversed',
-      description: `Refund: ${refund.reason || 'customer request'}`,
-    });
-
-  if (ledgerError) {
-    console.error('Error creating refund ledger entry:', ledgerError);
-  }
-
-  console.log('Refund processed successfully:', refund.id);
-  return 'success';
+  console.log('Refunds processed successfully:', refunds.map((r: any) => r.id));
+  return insertedAnyRefund ? 'success' : 'success:already_recorded';
 }
 
 // =====================================================

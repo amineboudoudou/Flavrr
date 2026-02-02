@@ -23,13 +23,16 @@ export const OwnerLogin: React.FC = () => {
         if (user && !authLoading && !workspaceLoading) {
             if (from) {
                 navigate(from, { replace: true });
-            } else if (memberships.length === 0) {
-                navigate('/onboarding/create-workspace', { replace: true });
-            } else if (memberships.length === 1) {
-                navigate(`/app/${memberships[0].slug}`, { replace: true });
-            } else {
-                navigate('/select-workspace', { replace: true });
+                return;
             }
+
+            if (memberships.length > 1) {
+                navigate('/select-workspace', { replace: true });
+                return;
+            }
+
+            const slug = memberships[0]?.slug || 'flavrr';
+            navigate(`/app/${slug}`, { replace: true });
         }
     }, [user, authLoading, workspaceLoading, memberships, from, navigate]);
 
@@ -73,7 +76,7 @@ export const OwnerLogin: React.FC = () => {
                         </div>
                         <div>
                             <h1 className="text-gray-900 font-serif text-3xl font-bold tracking-tight">
-                                CAFÉ DU GRIOT
+                                FLAVRR
                             </h1>
                         </div>
                     </div>
@@ -165,7 +168,7 @@ export const OwnerLogin: React.FC = () => {
 
                 {/* Footer */}
                 <p className="text-gray-400 text-xs text-center mt-6">
-                    © {new Date().getFullYear()} Café Du Griot. All rights reserved.
+                    © {new Date().getFullYear()} Flavrr. All rights reserved.
                 </p>
             </div>
         </div>

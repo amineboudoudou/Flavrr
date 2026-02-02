@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -8,7 +8,7 @@ import { ShoppingBag } from 'lucide-react';
 export const CreateWorkspace: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { refreshMemberships } = useWorkspace();
+    const { refreshMemberships, memberships, loading: workspaceLoading } = useWorkspace();
     
     const [name, setName] = useState('');
     const [slug, setSlug] = useState('');
@@ -30,6 +30,14 @@ export const CreateWorkspace: React.FC = () => {
             setSlug(generateSlug(value));
         }
     };
+
+    // If user already has a workspace, skip onboarding
+    useEffect(() => {
+        if (!workspaceLoading && memberships.length > 0) {
+            const slug = memberships[0].slug || 'flavrr';
+            navigate(`/app/${slug}`, { replace: true });
+        }
+    }, [workspaceLoading, memberships, navigate]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
