@@ -641,6 +641,11 @@ export async function updatePromo(promoId: string, updates: Partial<CreatePromoP
 // ============================================
 
 export async function publicCreatePaymentIntent(data: any) {
+    // Ensure workspace slug fallback to avoid "Workspace not found" when org not yet loaded
+    const payload = {
+        ...data,
+        workspace_slug: data?.workspace_slug || 'flavrr',
+    };
     // Add cache-busting for iOS Safari
     const url = new URL(`${EDGE_FUNCTION_URL}/create-payment-intent`);
     url.searchParams.set('t', Date.now().toString());
@@ -651,7 +656,7 @@ export async function publicCreatePaymentIntent(data: any) {
             'Content-Type': 'application/json',
             'apikey': SUPABASE_ANON_KEY
         },
-        body: JSON.stringify({ ...data }),
+        body: JSON.stringify(payload),
         cache: 'no-store' // Prevent iOS caching
     });
     
