@@ -151,7 +151,7 @@ serve(async (req) => {
     const fetchWorkspace = async (slug: string) => {
       return supabase
         .from('workspaces')
-        .select('id, name, slug')
+        .select('id, name, slug, org_id')
         .eq('slug', slug)
         .single();
     };
@@ -222,6 +222,7 @@ serve(async (req) => {
           .insert({
             workspace_id: workspace.id,
             status: 'draft',
+            org_id: workspace.org_id,
             subtotal_cents: body.totals.subtotal_cents,
             delivery_fee_cents: body.totals.delivery_fee_cents,
             service_fee_cents: body.totals.service_fee_cents,
