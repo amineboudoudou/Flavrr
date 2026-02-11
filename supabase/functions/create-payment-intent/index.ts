@@ -120,6 +120,11 @@ serve(async (req) => {
 
     const body = await req.json();
 
+    // Backward compatibility: default workspace slug if client omitted it
+    if (!body.workspace_slug) {
+      body.workspace_slug = 'flavrr';
+    }
+
     if (!isMode1(body) && !isMode2(body)) {
       return new Response(JSON.stringify({ error: 'Invalid request body' }), {
         status: 400,
