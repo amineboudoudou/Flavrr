@@ -118,7 +118,14 @@ serve(async (req) => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const body = await req.json();
+    const raw = await req.text();
+    let body: any;
+    try {
+      body = JSON.parse(raw || '{}');
+    } catch (e) {
+      console.error('Failed to parse JSON body', raw, e);
+      return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
     // Backward compatibility: default workspace slug if client omitted it
     if (!body.workspace_slug) {
@@ -130,6 +137,7 @@ serve(async (req) => {
       mode: isMode1(body) ? 'mode1' : isMode2(body) ? 'mode2' : 'unknown',
       has_items: Array.isArray(body?.items),
       totals_keys: body?.totals ? Object.keys(body.totals) : null,
+      raw,
     }));
 
     if (!isMode1(body) && !isMode2(body)) {
@@ -169,7 +177,15 @@ serve(async (req) => {
     if (isMode1(body)) {
       orderId = body.order_id;
     } else {
-      validateMode2(body);
+      try {
+        validateMode2(body);
+      } catch (validationError: any) {
+        console.error('Validation error', validationError?.message || validationError);
+        return new Response(JSON.stringify({ error: validationError?.message || 'Invalid payload' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
 
       // MODE 2: idempotent order create
       const { data: existingOrder } = await supabase
@@ -192,6 +208,16 @@ serve(async (req) => {
                 lng: body.fulfillment.dropoff_lng,
               }
             : null;
+
+        console.log('Creating order payload', {
+          workspace_id: workspace.id,
+          totals: body.totals,
+          currency,
+          idempotency_key: body.idempotency_key,
+          customer: body.customer,
+          fulfillment: body.fulfillment,
+          items_count: body.items?.length,
+        });
 
         const { data: createdOrder, error: createOrderError } = await supabase
           .from('orders')
@@ -225,12 +251,17 @@ serve(async (req) => {
               .single();
 
             if (conflictFetchError || !conflictedOrder) {
+              console.error('Order idempotency conflict fetch failed', conflictFetchError);
               throw new Error('Order idempotency conflict');
             }
 
             orderId = conflictedOrder.id;
           } else {
-            throw new Error('Failed to create order');
+            console.error('Failed to create order', createOrderError);
+            return new Response(JSON.stringify({ error: 'Failed to create order', details: createOrderError?.message || createOrderError }), {
+              status: 500,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
           }
         } else {
           orderId = createdOrder.id;
