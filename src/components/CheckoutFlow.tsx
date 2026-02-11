@@ -161,23 +161,31 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
         const slots: { label: string; value: string }[] = [];
         const now = new Date();
         const prepBuffer = organization.settings.default_prep_time_minutes || 30;
+        const locale = lang === 'fr' ? 'fr-CA' : 'en-CA';
 
-        // Current day of week (0-6)
-        const currentDay = now.getDay();
-        const hoursToday = organization.business_hours.find(h => h.day_of_week === currentDay);
+        // Look ahead up to 7 days (including today)
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+            const date = new Date(now);
+            date.setDate(now.getDate() + dayOffset);
 
-        if (hoursToday && !hoursToday.is_closed) {
-            const [openHour, openMin] = hoursToday.open_time.split(':').map(Number);
-            const [closeHour, closeMin] = hoursToday.close_time.split(':').map(Number);
+            const dayOfWeek = date.getDay();
+            const hours = organization.business_hours.find(h => h.day_of_week === dayOfWeek);
+            if (!hours || hours.is_closed) continue;
 
-            const openTimeDate = new Date(now);
+            const [openHour, openMin] = hours.open_time.split(':').map(Number);
+            const [closeHour, closeMin] = hours.close_time.split(':').map(Number);
+
+            const openTimeDate = new Date(date);
             openTimeDate.setHours(openHour, openMin, 0, 0);
 
-            const closeTimeDate = new Date(now);
+            const closeTimeDate = new Date(date);
             closeTimeDate.setHours(closeHour, closeMin, 0, 0);
 
-            // Start time is whichever is later: opening time or (now + prep buffer)
-            const earliestPossible = new Date(now.getTime() + prepBuffer * 60000);
+            // Earliest start respects prep buffer when dayOffset is 0 (today)
+            const earliestPossible = dayOffset === 0
+                ? new Date(now.getTime() + prepBuffer * 60000)
+                : openTimeDate;
+
             let startTime = earliestPossible > openTimeDate ? earliestPossible : openTimeDate;
 
             // Round up to next 1-hour interval
@@ -187,16 +195,23 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
             }
             startTime.setSeconds(0, 0);
 
-            // Generate slots every 60 minutes until closing time
             while (startTime < closeTimeDate) {
-                const timeStr = startTime.toLocaleTimeString(lang === 'fr' ? 'fr-CA' : 'en-CA', {
+                const dayLabel = startTime.toLocaleDateString(locale, {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                const timeStr = startTime.toLocaleTimeString(locale, {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: false
                 });
-                slots.push({ label: timeStr, value: startTime.toISOString() });
+                slots.push({ label: `${dayLabel} · ${timeStr}`, value: startTime.toISOString() });
                 startTime = new Date(startTime.getTime() + 60 * 60000);
             }
+
+            // Stop early if we already have future slots
+            if (slots.length > 0) break;
         }
 
         return slots;
