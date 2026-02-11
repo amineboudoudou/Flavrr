@@ -277,7 +277,11 @@ serve(async (req) => {
 
           const { error: orderItemsError } = await supabase.from('order_items').insert(orderItems);
           if (orderItemsError) {
-            throw new Error('Failed to create order items');
+            console.error('Failed to create order items', orderItemsError);
+            return new Response(JSON.stringify({ error: 'ITEMS_UNAVAILABLE', details: orderItemsError.message || orderItemsError }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
           }
         }
       }
