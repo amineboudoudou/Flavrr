@@ -246,7 +246,7 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                     }
                     
                     const res = await api.publicCreatePaymentIntent({
-                        workspace_slug: organization?.slug || 'cafe-du-griot',
+                        workspace_slug: organization?.slug || 'flavrr',
                         idempotency_key: idempotencyKey,
                         currency: 'cad',
                         items: items.map(i => ({

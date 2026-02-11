@@ -25,8 +25,22 @@ import type {
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const EDGE_FUNCTION_URL = import.meta.env.VITE_EDGE_FUNCTION_URL ||
-    (SUPABASE_URL ? `${SUPABASE_URL}/functions/v1` : '');
+
+// Derive the functions URL in a way that works with both legacy supabase.co/functions/v1
+// and the newer functions.supabase.co domain. Prefer explicit env if provided.
+const EDGE_FUNCTION_URL = (() => {
+    if (import.meta.env.VITE_EDGE_FUNCTION_URL) return import.meta.env.VITE_EDGE_FUNCTION_URL;
+    if (!SUPABASE_URL) return '';
+    try {
+        const url = new URL(SUPABASE_URL);
+        // Transform xyz.supabase.co -> xyz.functions.supabase.co
+        const functionsHost = url.hostname.replace('.supabase.co', '.functions.supabase.co');
+        return `${url.protocol}//${functionsHost}`;
+    } catch {
+        // Fallback to legacy pattern
+        return `${SUPABASE_URL}/functions/v1`;
+    }
+})();
 
 const API_TIMEOUT = 30000; // 30 seconds
 
