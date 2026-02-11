@@ -233,7 +233,6 @@ serve(async (req) => {
             customer_email: body.customer?.email || null,
             customer_phone: body.customer?.phone || null,
             delivery_address: deliveryAddress,
-            delivery_instructions: body.fulfillment?.notes || null,
           })
           .select('id')
           .single();
