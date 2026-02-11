@@ -452,6 +452,7 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                                                 onAddressSelect={handleAddressSelect}
                                                 placeholder="Commencez à taper votre adresse..."
                                                 className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder:text-white/20 focus:border-pink-500 outline-none transition-all"
+                                                restrictCountries={['CA']}
                                             />
                                         </div>
                                         <div className="space-y-2">
