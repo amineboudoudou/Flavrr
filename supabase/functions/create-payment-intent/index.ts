@@ -125,6 +125,13 @@ serve(async (req) => {
       body.workspace_slug = 'flavrr';
     }
 
+    console.log('create-payment-intent request body', JSON.stringify({
+      workspace_slug: body.workspace_slug,
+      mode: isMode1(body) ? 'mode1' : isMode2(body) ? 'mode2' : 'unknown',
+      has_items: Array.isArray(body?.items),
+      totals_keys: body?.totals ? Object.keys(body.totals) : null,
+    }));
+
     if (!isMode1(body) && !isMode2(body)) {
       return new Response(JSON.stringify({ error: 'Invalid request body' }), {
         status: 400,
