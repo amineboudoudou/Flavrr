@@ -139,14 +139,26 @@ serve(async (req) => {
       });
     }
 
-    const workspaceSlug = body.workspace_slug;
+    let workspaceSlug = body.workspace_slug;
 
-    // Get workspace
-    const { data: workspace, error: workspaceError } = await supabase
-      .from('workspaces')
-      .select('id, name, slug')
-      .eq('slug', workspaceSlug)
-      .single();
+    // Get workspace with fallback retry to 'flavrr'
+    const fetchWorkspace = async (slug: string) => {
+      return supabase
+        .from('workspaces')
+        .select('id, name, slug')
+        .eq('slug', slug)
+        .single();
+    };
+
+    let { data: workspace, error: workspaceError } = await fetchWorkspace(workspaceSlug);
+
+    if (workspaceError || !workspace) {
+      console.warn('Workspace not found for slug, retrying with flavrr', workspaceSlug);
+      workspaceSlug = 'flavrr';
+      const retry = await fetchWorkspace(workspaceSlug);
+      workspace = retry.data;
+      workspaceError = retry.error;
+    }
 
     if (workspaceError || !workspace) {
       return new Response(JSON.stringify({ error: 'Workspace not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
