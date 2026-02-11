@@ -7,6 +7,12 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
   httpClient: Stripe.createFetchHttpClient(),
 });
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+};
+
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -106,7 +112,7 @@ function validateMode2(req: Mode2Request) {
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -117,7 +123,7 @@ serve(async (req) => {
     if (!isMode1(body) && !isMode2(body)) {
       return new Response(JSON.stringify({ error: 'Invalid request body' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
@@ -131,7 +137,7 @@ serve(async (req) => {
       .single();
 
     if (workspaceError || !workspace) {
-      return new Response(JSON.stringify({ error: 'Workspace not found' }), { status: 404 });
+      return new Response(JSON.stringify({ error: 'Workspace not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     let orderId: string;
@@ -231,12 +237,12 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404 });
+      return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Verify order is in correct state
     if (order.status !== 'draft' && order.status !== 'pending_payment') {
-      return new Response(JSON.stringify({ error: 'Order cannot be paid in current status' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Order cannot be paid in current status' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Check if payment already exists
@@ -247,7 +253,7 @@ serve(async (req) => {
       .single();
 
     if (existingPayment && existingPayment.status === 'succeeded') {
-      return new Response(JSON.stringify({ error: 'Order already paid' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Order already paid' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get seller payout account
@@ -258,11 +264,11 @@ serve(async (req) => {
       .single();
 
     if (payoutError || !payoutAccount) {
-      return new Response(JSON.stringify({ error: 'Seller has not set up payouts' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Seller has not set up payouts' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!payoutAccount.charges_enabled) {
-      return new Response(JSON.stringify({ error: 'Seller cannot accept payments yet' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'Seller cannot accept payments yet' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Calculate platform fee (5% of subtotal)
@@ -284,7 +290,7 @@ serve(async (req) => {
         payment_intent_id: existingPI.id,
         client_secret: existingPI.client_secret,
       }), {
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -333,14 +339,14 @@ serve(async (req) => {
       payment_intent_id: paymentIntent.id,
       client_secret: paymentIntent.client_secret,
     }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Error in create-payment-intent:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
