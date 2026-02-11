@@ -127,10 +127,8 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Backward compatibility: default workspace slug if client omitted it
-    if (!body.workspace_slug) {
-      body.workspace_slug = 'flavrr';
-    }
+    // Force workspace slug to flavrr to avoid invalid slugs from client
+    body.workspace_slug = 'flavrr';
 
     console.log('create-payment-intent request body', JSON.stringify({
       workspace_slug: body.workspace_slug,
