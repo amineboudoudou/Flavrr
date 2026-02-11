@@ -27,17 +27,26 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Derive the functions URL in a way that works with both legacy supabase.co/functions/v1
-// and the newer functions.supabase.co domain. Prefer explicit env if provided.
+// and the newer functions.supabase.co domain. Normalize even if the env value uses the old host.
 const EDGE_FUNCTION_URL = (() => {
-    if (import.meta.env.VITE_EDGE_FUNCTION_URL) return import.meta.env.VITE_EDGE_FUNCTION_URL;
+    const normalize = (raw: string) => {
+        try {
+            const url = new URL(raw);
+            // If already using functions domain, keep it
+            if (url.hostname.includes('.functions.supabase.co')) return `${url.protocol}//${url.hostname}`;
+            // Transform xyz.supabase.co[/functions/v1] -> xyz.functions.supabase.co
+            const baseHost = url.hostname.replace('.supabase.co', '.functions.supabase.co');
+            return `${url.protocol}//${baseHost}`;
+        } catch {
+            return raw;
+        }
+    };
+
+    if (import.meta.env.VITE_EDGE_FUNCTION_URL) return normalize(import.meta.env.VITE_EDGE_FUNCTION_URL);
     if (!SUPABASE_URL) return '';
     try {
-        const url = new URL(SUPABASE_URL);
-        // Transform xyz.supabase.co -> xyz.functions.supabase.co
-        const functionsHost = url.hostname.replace('.supabase.co', '.functions.supabase.co');
-        return `${url.protocol}//${functionsHost}`;
+        return normalize(SUPABASE_URL);
     } catch {
-        // Fallback to legacy pattern
         return `${SUPABASE_URL}/functions/v1`;
     }
 })();
