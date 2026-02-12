@@ -35,25 +35,25 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
 
     return (
         <div
-            className={`bg-neutral-800 border rounded-xl p-4 cursor-pointer transition-all hover:border-primary/50 ${isNew
-                ? 'border-primary/50 animate-pulse-glow'
-                : 'border-white/10'
+            className={`bg-surface border rounded-[var(--radius)] p-4 cursor-pointer transition-all hover:border-primary/40 hover:bg-surface-2 shadow-[var(--shadow)] ${isNew
+                ? 'border-primary/30'
+                : 'border-border'
                 }`}
             onClick={onClick}
         >
             {/* Header: Order # + Time */}
             <div className="flex items-start justify-between mb-3">
                 <div>
-                    <h4 className="text-white font-semibold text-lg">
+                    <h4 className="text-text font-semibold text-lg">
                         #{order.order_number.toString().padStart(4, '0')}
                     </h4>
-                    <p className="text-white/40 text-xs">{timeAgo}</p>
+                    <p className="text-muted text-xs">{timeAgo}</p>
                 </div>
 
                 {/* Fulfillment Badge */}
-                <span className={`text-xs font-semibold px-2 py-1 rounded ${order.fulfillment_type === 'delivery'
-                    ? 'bg-purple-500/20 text-purple-300'
-                    : 'bg-blue-500/20 text-blue-300'
+                <span className={`text-xs font-semibold px-2 py-1 rounded-lg border ${order.fulfillment_type === 'delivery'
+                    ? 'bg-purple-500/10 text-purple-700 border-purple-200'
+                    : 'bg-blue-500/10 text-blue-700 border-blue-200'
                     }`}>
                     {order.fulfillment_type === 'delivery' ? '🚚 Delivery' : '🏃 Pickup'}
                 </span>
@@ -61,7 +61,7 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
 
             {/* Customer Info */}
             <div className="mb-3">
-                <p className="text-white text-sm font-medium">{order.customer_name}</p>
+                <p className="text-text text-sm font-medium">{order.customer_name}</p>
                 <a
                     href={`tel:${order.customer_phone}`}
                     className="text-primary text-xs hover:underline"
@@ -72,11 +72,11 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
             </div>
 
             {/* Items Preview */}
-            <p className="text-white/60 text-xs mb-3 line-clamp-2">{itemsPreview}</p>
+            <p className="text-muted text-xs mb-3 line-clamp-2">{itemsPreview}</p>
 
             {/* Total */}
-            <div className="flex items-center justify-between pt-3 border-t border-white/5">
-                <span className="text-white font-bold text-lg">${(order.total || 0).toFixed(2)}</span>
+            <div className="flex items-center justify-between pt-3 border-t border-border">
+                <span className="text-text font-bold text-lg">${(order.total || 0).toFixed(2)}</span>
 
                 {/* Quick Action Button */}
                 {onQuickAction && quickActionLabel && (
@@ -95,7 +95,7 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
             {/* "New" Indicator */}
             {isNew && (
                 <div className="absolute top-2 right-2">
-                    <span className="bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-full animate-pulse">
+                    <span className="bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-full">
                         NEW
                     </span>
                 </div>

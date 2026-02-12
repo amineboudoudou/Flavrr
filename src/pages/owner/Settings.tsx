@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
 import { AddressAutocomplete, type AddressComponents } from '../../components/AddressAutocomplete';
 import type { VerifiedAddress } from '../../types';
@@ -238,9 +239,7 @@ export const Settings: React.FC = () => {
     if (loading) {
         return (
             <OwnerLayout>
-                <div className="flex items-center justify-center h-screen">
-                    <div className="text-white">Loading...</div>
-                </div>
+                <BrandedLoader fullPage message="Loading settings…" />
             </OwnerLayout>
         );
     }
@@ -262,31 +261,31 @@ export const Settings: React.FC = () => {
             <div className="p-6 max-w-4xl">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-white text-2xl font-bold mb-2">Restaurant Settings</h1>
-                    <p className="text-white/60 text-sm">
+                    <h1 className="text-text text-2xl font-bold mb-2">Settings</h1>
+                    <p className="text-muted text-sm">
                         Configure your restaurant information and delivery options
                     </p>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-4 mb-8 border-b border-white/10">
+                <div className="flex gap-4 mb-8 border-b border-border">
                     <button
                         onClick={() => setActiveTab('general')}
-                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'general' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'general' ? 'text-text' : 'text-muted hover:text-text'}`}
                     >
                         General
                         {activeTab === 'general' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />}
                     </button>
                     <button
                         onClick={() => setActiveTab('storefront')}
-                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'storefront' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'storefront' ? 'text-text' : 'text-muted hover:text-text'}`}
                     >
                         Storefront Link
                         {activeTab === 'storefront' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />}
                     </button>
                     <button
                         onClick={() => setActiveTab('banking')}
-                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'banking' ? 'text-white' : 'text-white/40 hover:text-white'}`}
+                        className={`pb-4 px-2 text-sm font-medium transition-colors relative ${activeTab === 'banking' ? 'text-text' : 'text-muted hover:text-text'}`}
                     >
                         Banking & Payouts
                         {activeTab === 'banking' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />}
@@ -296,8 +295,8 @@ export const Settings: React.FC = () => {
                 {/* Success Message */}
                 {successMessage && (
                     <div className={`mb-6 border px-4 py-3 rounded-lg ${successMessage.includes('✅')
-                        ? 'bg-green-500/20 border-green-500/50 text-green-400'
-                        : 'bg-red-500/20 border-red-500/50 text-red-400'
+                        ? 'bg-green-500/10 border-green-200 text-green-700'
+                        : 'bg-red-500/10 border-red-200 text-red-700'
                         }`}>
                         {successMessage}
                     </div>
@@ -310,39 +309,39 @@ export const Settings: React.FC = () => {
                     {activeTab === 'general' && (
                         <>
                             {/* Restaurant Info */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                                <h2 className="text-white text-lg font-semibold mb-4">Restaurant Information</h2>
+                            <div className="bg-surface border border-border rounded-[var(--radius)] p-6 shadow-[var(--shadow)]">
+                                <h2 className="text-text text-lg font-semibold mb-4">Restaurant Information</h2>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-white/70 text-sm mb-2">Restaurant Name</label>
+                                        <label className="block text-muted text-sm mb-2">Restaurant Name</label>
                                         <input
                                             type="text"
                                             value={settings.name}
                                             onChange={(e) => updateField('name', e.target.value)}
-                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                            className="w-full bg-surface border border-border rounded-[var(--radius)] px-4 py-2 text-text"
                                             placeholder="Café Du Griot"
                                         />
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
-                                            <label className="block text-white/70 text-sm mb-2">Phone</label>
+                                            <label className="block text-muted text-sm mb-2">Phone</label>
                                             <input
                                                 type="tel"
                                                 value={settings.phone || ''}
                                                 onChange={(e) => updateField('phone', e.target.value)}
-                                                className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                                className="w-full bg-surface border border-border rounded-[var(--radius)] px-4 py-2 text-text"
                                                 placeholder="+1 (555) 123-4567"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-white/70 text-sm mb-2">Email</label>
+                                            <label className="block text-muted text-sm mb-2">Email</label>
                                             <input
                                                 type="email"
                                                 value={settings.email || ''}
                                                 onChange={(e) => updateField('email', e.target.value)}
-                                                className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                                className="w-full bg-surface border border-border rounded-[var(--radius)] px-4 py-2 text-text"
                                                 placeholder="contact@restaurant.com"
                                             />
                                         </div>

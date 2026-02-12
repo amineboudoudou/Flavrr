@@ -2,10 +2,19 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@14.5.0?target=deno';
 
-const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-  apiVersion: '2023-10-16',
-  httpClient: Stripe.createFetchHttpClient(),
-});
+function getStripeClient() {
+  const key = Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('STRIPE_TEST_SECRET_KEY') || '';
+  if (!key) {
+    throw new Error('Missing STRIPE_SECRET_KEY');
+  }
+  if (key.startsWith('sk_live_')) {
+    throw new Error('Stripe must be in TEST mode');
+  }
+  return new Stripe(key, {
+    apiVersion: '2023-10-16',
+    httpClient: Stripe.createFetchHttpClient(),
+  });
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -115,8 +124,11 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const stripe = getStripeClient();
 
     const raw = await req.text();
     let body: any;
@@ -139,7 +151,7 @@ serve(async (req) => {
     }));
 
     if (!isMode1(body) && !isMode2(body)) {
-      return new Response(JSON.stringify({ error: 'Invalid request body' }), {
+      return new Response(JSON.stringify({ error: 'Invalid request body', requestId }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -167,7 +179,7 @@ serve(async (req) => {
     }
 
     if (workspaceError || !workspace) {
-      return new Response(JSON.stringify({ error: 'Workspace not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Workspace not found', requestId }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     let orderId: string;
@@ -179,7 +191,7 @@ serve(async (req) => {
         validateMode2(body);
       } catch (validationError: any) {
         console.error('Validation error', validationError?.message || validationError);
-        return new Response(JSON.stringify({ error: validationError?.message || 'Invalid payload' }), {
+        return new Response(JSON.stringify({ error: validationError?.message || 'Invalid payload', requestId }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
@@ -256,7 +268,7 @@ serve(async (req) => {
             orderId = conflictedOrder.id;
           } else {
             console.error('Failed to create order', createOrderError);
-            return new Response(JSON.stringify({ error: 'Failed to create order', details: createOrderError?.message || createOrderError }), {
+            return new Response(JSON.stringify({ error: 'Failed to create order', details: createOrderError?.message || createOrderError, requestId }), {
               status: 500,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
@@ -276,7 +288,7 @@ serve(async (req) => {
           const { error: orderItemsError } = await supabase.from('order_items').insert(orderItems);
           if (orderItemsError) {
             console.error('Failed to create order items', orderItemsError);
-            return new Response(JSON.stringify({ error: 'ITEMS_UNAVAILABLE', details: orderItemsError.message || orderItemsError }), {
+            return new Response(JSON.stringify({ error: 'ITEMS_UNAVAILABLE', details: orderItemsError.message || orderItemsError, requestId }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
@@ -294,12 +306,12 @@ serve(async (req) => {
       .single();
 
     if (orderError || !order) {
-      return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Order not found', requestId }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Verify order is in correct state
     if (order.status !== 'draft' && order.status !== 'pending_payment') {
-      return new Response(JSON.stringify({ error: 'Order cannot be paid in current status' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Order cannot be paid in current status', requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Check if payment already exists
@@ -310,7 +322,7 @@ serve(async (req) => {
       .single();
 
     if (existingPayment && existingPayment.status === 'succeeded') {
-      return new Response(JSON.stringify({ error: 'Order already paid' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Order already paid', requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get seller payout account
@@ -321,11 +333,11 @@ serve(async (req) => {
       .single();
 
     if (payoutError || !payoutAccount) {
-      return new Response(JSON.stringify({ error: 'Seller has not set up payouts' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Seller has not set up payouts', requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!payoutAccount.charges_enabled) {
-      return new Response(JSON.stringify({ error: 'Seller cannot accept payments yet' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Seller cannot accept payments yet', requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Calculate platform fee (5% of subtotal)
@@ -346,6 +358,7 @@ serve(async (req) => {
         order_id: orderId,
         payment_intent_id: existingPI.id,
         client_secret: existingPI.client_secret,
+        requestId,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -395,14 +408,18 @@ serve(async (req) => {
       order_id: orderId,
       payment_intent_id: paymentIntent.id,
       client_secret: paymentIntent.client_secret,
+      requestId,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Error in create-payment-intent:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    const message = (error as any)?.message || 'Internal error';
+    const isStripe = Boolean((error as any)?.type) || Boolean((error as any)?.raw);
+    const status = isStripe ? 400 : 500;
+    return new Response(JSON.stringify({ error: message, requestId }), {
+      status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

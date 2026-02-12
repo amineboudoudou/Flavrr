@@ -80,17 +80,17 @@ export const EmailMarketing: React.FC = () => {
             <div className="p-6 max-w-4xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Email Marketing</h1>
-                    <p className="text-white/60">Send targeted email campaigns to your customers</p>
+                    <h1 className="text-3xl font-bold text-text mb-2">Marketing</h1>
+                    <p className="text-muted">Send targeted email campaigns to your customers</p>
                 </div>
 
                 {/* Campaign Form */}
-                <div className="bg-white/5 border border-white/10 rounded-lg p-6 mb-6">
-                    <h2 className="text-xl font-bold text-white mb-6">Create Campaign</h2>
+                <div className="bg-surface border border-border rounded-[var(--radius)] p-6 mb-6 shadow-[var(--shadow)]">
+                    <h2 className="text-xl font-bold text-text mb-6">Create Campaign</h2>
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-white/80 text-sm font-medium mb-2">
+                            <label className="block text-muted text-sm font-medium mb-2">
                                 Campaign Name *
                             </label>
                             <input
@@ -98,12 +98,13 @@ export const EmailMarketing: React.FC = () => {
                                 value={formData.name}
                                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                 placeholder="Spring Promotion 2026"
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                disabled={sending}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-white/80 text-sm font-medium mb-2">
+                            <label className="block text-muted text-sm font-medium mb-2">
                                 Email Subject *
                             </label>
                             <input
@@ -111,12 +112,13 @@ export const EmailMarketing: React.FC = () => {
                                 value={formData.subject}
                                 onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
                                 placeholder="Special Offer Just for You!"
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                disabled={sending}
                             />
                         </div>
 
                         <div>
-                            <label className="block text-white/80 text-sm font-medium mb-2">
+                            <label className="block text-muted text-sm font-medium mb-2">
                                 Email Content (HTML) *
                             </label>
                             <textarea
@@ -124,16 +126,17 @@ export const EmailMarketing: React.FC = () => {
                                 onChange={(e) => setFormData({ ...formData, html_content: e.target.value })}
                                 placeholder="<h1>Hello!</h1><p>We have a special offer for you...</p>"
                                 rows={10}
-                                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary font-mono text-sm"
+                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary font-mono text-sm"
+                                disabled={sending}
                             />
-                            <p className="text-white/40 text-xs mt-2">
+                            <p className="text-muted text-xs mt-2">
                                 Tip: Use HTML for formatting. Include images with full URLs.
                             </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">
+                                <label className="block text-muted text-sm font-medium mb-2">
                                     Minimum Orders (Filter)
                                 </label>
                                 <input
@@ -142,15 +145,16 @@ export const EmailMarketing: React.FC = () => {
                                     value={formData.min_orders}
                                     onChange={(e) => setFormData({ ...formData, min_orders: parseInt(e.target.value) || 0 })}
                                     placeholder="0"
-                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                    disabled={sending}
                                 />
-                                <p className="text-white/40 text-xs mt-1">
+                                <p className="text-muted text-xs mt-1">
                                     Only send to customers with at least this many orders
                                 </p>
                             </div>
 
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">
+                                <label className="block text-muted text-sm font-medium mb-2">
                                     Test Email Address
                                 </label>
                                 <input
@@ -158,9 +162,10 @@ export const EmailMarketing: React.FC = () => {
                                     value={formData.test_email}
                                     onChange={(e) => setFormData({ ...formData, test_email: e.target.value })}
                                     placeholder="your@email.com"
-                                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                    disabled={sending}
                                 />
-                                <p className="text-white/40 text-xs mt-1">
+                                <p className="text-muted text-xs mt-1">
                                     Send a test email to this address first
                                 </p>
                             </div>
@@ -172,14 +177,14 @@ export const EmailMarketing: React.FC = () => {
                         <button
                             onClick={handleSendTest}
                             disabled={sending || !formData.subject || !formData.html_content}
-                            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-6 py-3 bg-surface text-text border border-border rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-2"
                         >
                             {sending ? 'Sending...' : '📧 Send Test Email'}
                         </button>
                         <button
                             onClick={handleSendCampaign}
                             disabled={sending || !formData.name || !formData.subject || !formData.html_content}
-                            className="px-6 py-3 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="px-6 py-3 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[var(--shadow)]"
                         >
                             {sending ? 'Sending...' : '🚀 Send Campaign'}
                         </button>
@@ -187,9 +192,9 @@ export const EmailMarketing: React.FC = () => {
 
                     {/* Message */}
                     {message && (
-                        <div className={`mt-4 p-4 rounded-lg ${message.startsWith('✓')
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-red-500/20 text-red-400'
+                        <div className={`mt-4 p-4 rounded-[var(--radius)] border ${message.startsWith('✓')
+                                ? 'bg-green-500/10 text-green-700 border-green-200'
+                                : 'bg-red-500/10 text-red-700 border-red-200'
                             }`}>
                             {message}
                         </div>
@@ -197,9 +202,9 @@ export const EmailMarketing: React.FC = () => {
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6">
-                    <h3 className="text-blue-400 font-bold mb-2">📝 Email Marketing Tips</h3>
-                    <ul className="text-white/80 text-sm space-y-2">
+                <div className="bg-surface-2 border border-border rounded-[var(--radius)] p-6">
+                    <h3 className="text-text font-bold mb-2">📝 Email Marketing Tips</h3>
+                    <ul className="text-muted text-sm space-y-2">
                         <li>• Only customers who opted in to marketing emails will receive campaigns</li>
                         <li>• Always send a test email to yourself first to check formatting</li>
                         <li>• Use clear subject lines and compelling content</li>

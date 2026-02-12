@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
 import { Allergen } from '../../types';
 
@@ -105,9 +106,7 @@ export const MenuManagement: React.FC = () => {
     if (loading) {
         return (
             <OwnerLayout>
-                <div className="flex items-center justify-center h-screen">
-                    <div className="text-white">Loading...</div>
-                </div>
+                <BrandedLoader fullPage message="Loading menu…" />
             </OwnerLayout>
         );
     }
@@ -117,19 +116,19 @@ export const MenuManagement: React.FC = () => {
             <div className="p-6">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-white text-2xl font-bold mb-2">Menu Management</h1>
-                    <p className="text-white/60 text-sm">
+                    <h1 className="text-text text-2xl font-bold mb-2">Products</h1>
+                    <p className="text-muted text-sm">
                         Manage your menu items and categories
                     </p>
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 mb-6 border-b border-white/10">
+                <div className="flex gap-2 mb-6 border-b border-border">
                     <button
                         onClick={() => setActiveTab('items')}
                         className={`px-4 py-2 font-medium transition-colors ${activeTab === 'items'
                                 ? 'text-primary border-b-2 border-primary'
-                                : 'text-white/60 hover:text-white'
+                                : 'text-muted hover:text-text'
                             }`}
                     >
                         Menu Items ({menuItems.length})
@@ -138,7 +137,7 @@ export const MenuManagement: React.FC = () => {
                         onClick={() => setActiveTab('categories')}
                         className={`px-4 py-2 font-medium transition-colors ${activeTab === 'categories'
                                 ? 'text-primary border-b-2 border-primary'
-                                : 'text-white/60 hover:text-white'
+                                : 'text-muted hover:text-text'
                             }`}
                     >
                         Categories ({categories.length})
@@ -153,7 +152,7 @@ export const MenuManagement: React.FC = () => {
                             <select
                                 value={selectedCategory}
                                 onChange={(e) => setSelectedCategory(e.target.value)}
-                                className="bg-neutral-800 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                className="bg-surface border border-border rounded-[var(--radius)] px-4 py-2 text-text shadow-[var(--shadow)]"
                             >
                                 <option value="all">All Categories</option>
                                 {categories.map(cat => (
@@ -166,7 +165,7 @@ export const MenuManagement: React.FC = () => {
                                     setEditingItem(null);
                                     setShowItemModal(true);
                                 }}
-                                className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-lg transition-colors font-medium"
+                                className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-[var(--radius)] transition-colors font-medium shadow-[var(--shadow)]"
                             >
                                 + Add Menu Item
                             </button>
@@ -175,12 +174,12 @@ export const MenuManagement: React.FC = () => {
                         {/* Items Grid */}
                         {filteredItems.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-white/60">No menu items yet. Create your first one!</p>
+                                <p className="text-muted">No menu items yet. Create your first one!</p>
                             </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredItems.map(item => (
-                                    <div key={item.id} className="bg-neutral-800 border border-white/10 rounded-xl overflow-hidden">
+                                    <div key={item.id} className="bg-surface border border-border rounded-[var(--radius)] overflow-hidden shadow-[var(--shadow)]">
                                         {item.image_url && (
                                             <img
                                                 src={item.image_url}
@@ -191,29 +190,29 @@ export const MenuManagement: React.FC = () => {
                                         <div className="p-4">
                                             <div className="flex items-start justify-between mb-2">
                                                 <div className="flex-1">
-                                                    <h3 className="text-white font-semibold">{item.name_en}</h3>
+                                                    <h3 className="text-text font-semibold">{item.name_en}</h3>
                                                     {item.is_best_seller && (
-                                                        <span className="inline-block mt-1 bg-primary/20 text-primary text-xs px-2 py-1 rounded">
+                                                        <span className="inline-block mt-1 bg-primary/10 text-primary text-xs px-2 py-1 rounded border border-primary/20">
                                                             ⭐ Best Seller
                                                         </span>
                                                     )}
                                                 </div>
                                                 <span className="text-primary font-bold">${(item.price_cents / 100).toFixed(2)}</span>
                                             </div>
-                                            <p className="text-white/60 text-sm mb-3 line-clamp-2">{item.description_en}</p>
+                                            <p className="text-muted text-sm mb-3 line-clamp-2">{item.description_en}</p>
                                             <div className="flex gap-2">
                                                 <button
                                                     onClick={() => {
                                                         setEditingItem(item);
                                                         setShowItemModal(true);
                                                     }}
-                                                    className="flex-1 bg-white/5 hover:bg-white/10 text-white text-sm px-3 py-2 rounded-lg transition-colors"
+                                                    className="flex-1 bg-surface-2 hover:bg-surface-2/70 text-text text-sm px-3 py-2 rounded-[var(--radius)] transition-colors border border-border"
                                                 >
                                                     Edit
                                                 </button>
                                                 <button
                                                     onClick={() => setDeleteConfirm({ type: 'item', id: item.id })}
-                                                    className="bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm px-3 py-2 rounded-lg transition-colors"
+                                                    className="bg-red-500/10 hover:bg-red-500/15 text-red-700 text-sm px-3 py-2 rounded-[var(--radius)] transition-colors border border-red-200"
                                                 >
                                                     Delete
                                                 </button>
@@ -228,27 +227,27 @@ export const MenuManagement: React.FC = () => {
                     <div>
                         <button
                             onClick={() => setShowCategoryModal(true)}
-                            className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-lg transition-colors font-medium mb-6"
+                            className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-[var(--radius)] transition-colors font-medium mb-6 shadow-[var(--shadow)]"
                         >
                             + Add Category
                         </button>
 
                         {categories.length === 0 ? (
                             <div className="text-center py-12">
-                                <p className="text-white/60">No categories yet. Create your first one!</p>
+                                <p className="text-muted">No categories yet. Create your first one!</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
                                 {categories.map(cat => (
-                                    <div key={cat.id} className="bg-neutral-800 border border-white/10 rounded-xl p-4 flex items-center justify-between">
+                                    <div key={cat.id} className="bg-surface border border-border rounded-[var(--radius)] p-4 flex items-center justify-between shadow-[var(--shadow)]">
                                         <div>
-                                            <h3 className="text-white font-semibold">{cat.name_en}</h3>
-                                            <p className="text-white/60 text-sm">{cat.name_fr}</p>
+                                            <h3 className="text-text font-semibold">{cat.name_en}</h3>
+                                            <p className="text-muted text-sm">{cat.name_fr}</p>
                                         </div>
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setDeleteConfirm({ type: 'category', id: cat.id })}
-                                                className="bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm px-4 py-2 rounded-lg transition-colors"
+                                                className="bg-red-500/10 hover:bg-red-500/15 text-red-700 text-sm px-4 py-2 rounded-[var(--radius)] transition-colors border border-red-200"
                                             >
                                                 Delete
                                             </button>
@@ -283,16 +282,16 @@ export const MenuManagement: React.FC = () => {
 
                 {/* Delete Confirmation */}
                 {deleteConfirm && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-neutral-800 border border-white/10 rounded-xl p-6 max-w-md w-full">
-                            <h3 className="text-white text-lg font-bold mb-4">Confirm Delete</h3>
-                            <p className="text-white/70 mb-6">
+                    <div className="fixed inset-0 bg-black/30 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+                        <div className="bg-surface border border-border rounded-[var(--radius)] p-6 max-w-md w-full shadow-[var(--shadow)]">
+                            <h3 className="text-text text-lg font-bold mb-4">Confirm Delete</h3>
+                            <p className="text-muted mb-6">
                                 Are you sure you want to delete this {deleteConfirm.type}? This action cannot be undone.
                             </p>
                             <div className="flex gap-3">
                                 <button
                                     onClick={() => setDeleteConfirm(null)}
-                                    className="flex-1 bg-white/5 hover:bg-white/10 text-white px-4 py-2 rounded-lg transition-colors"
+                                    className="flex-1 bg-surface-2 hover:bg-surface-2/70 text-text px-4 py-2 rounded-[var(--radius)] transition-colors border border-border"
                                 >
                                     Cancel
                                 </button>
@@ -304,7 +303,7 @@ export const MenuManagement: React.FC = () => {
                                             handleDeleteCategory(deleteConfirm.id);
                                         }
                                     }}
-                                    className="flex-1 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors"
+                                    className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-[var(--radius)] transition-colors"
                                 >
                                     Delete
                                 </button>

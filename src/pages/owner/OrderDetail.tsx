@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { formatDistanceToNow } from 'date-fns';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { StatusBadge } from '../../components/owner/Badge';
 import { StatusStepper } from '../../components/owner/StatusStepper';
 import { DeliveryPanel } from '../../components/owner/DeliveryPanel';
@@ -75,12 +76,7 @@ export const OrderDetail: React.FC = () => {
     if (loading) {
         return (
             <OwnerLayout>
-                <div className="flex items-center justify-center h-[calc(100vh-64px)]">
-                    <div className="text-white text-center">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-sm opacity-60">Loading order...</p>
-                    </div>
-                </div>
+                <BrandedLoader fullPage message="Loading order…" />
             </OwnerLayout>
         );
     }
@@ -109,7 +105,7 @@ export const OrderDetail: React.FC = () => {
                 {/* Back Button */}
                 <button
                     onClick={() => navigate('/owner')}
-                    className="flex items-center gap-2 text-white/60 hover:text-white mb-6 transition-colors"
+                    className="flex items-center gap-2 text-muted hover:text-text mb-6 transition-colors"
                 >
                     <ChevronLeft className="w-4 h-4" />
                     <span className="text-sm font-medium">Back to Orders</span>
@@ -119,13 +115,13 @@ export const OrderDetail: React.FC = () => {
                     {/* Main Content */}
                     <div className="lg:col-span-2 space-y-6">
                         {/* Header */}
-                        <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
+                        <div className="bg-surface border border-border rounded-[var(--radius)] p-6 shadow-[var(--shadow)]">
                             <div className="flex items-start justify-between mb-4">
                                 <div>
-                                    <h1 className="text-white text-3xl font-bold mb-2">
+                                    <h1 className="text-text text-3xl font-bold mb-2">
                                         Order #{order.order_number.toString().padStart(4, '0')}
                                     </h1>
-                                    <p className="text-white/60 text-sm">
+                                    <p className="text-muted text-sm">
                                         Placed {formatDistanceToNow(new Date(order.created_at), { addSuffix: true })}
                                     </p>
                                 </div>
@@ -133,23 +129,23 @@ export const OrderDetail: React.FC = () => {
                             </div>
 
                             {/* Customer Info */}
-                            <div className="border-t border-white/10 pt-4">
-                                <h3 className="text-white font-semibold mb-3">Customer</h3>
-                                <p className="text-white text-lg">{order.customer_name}</p>
+                            <div className="border-t border-border pt-4">
+                                <h3 className="text-text font-semibold mb-3">Customer</h3>
+                                <p className="text-text text-lg">{order.customer_name}</p>
                                 <a
                                     href={`tel:${order.customer_phone}`}
                                     className="text-primary hover:underline text-sm"
                                 >
                                     {order.customer_phone}
                                 </a>
-                                <p className="text-white/60 text-sm mt-1">{order.customer_email}</p>
+                                <p className="text-muted text-sm mt-1">{order.customer_email}</p>
                             </div>
 
                             {/* Fulfillment Type */}
-                            <div className="border-t border-white/10 pt-4 mt-4">
+                            <div className="border-t border-border pt-4 mt-4">
                                 <span className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold ${order.fulfillment_type === 'delivery'
-                                    ? 'bg-purple-500/20 text-purple-300'
-                                    : 'bg-blue-500/20 text-blue-300'
+                                    ? 'bg-purple-500/10 text-purple-700 border border-purple-200'
+                                    : 'bg-blue-500/10 text-blue-700 border border-blue-200'
                                     }`}>
                                     {order.fulfillment_type === 'delivery' ? '🚚 Delivery' : '🏃 Pickup'}
                                 </span>
@@ -157,30 +153,30 @@ export const OrderDetail: React.FC = () => {
                         </div>
 
                         {/* Items List */}
-                        <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                            <h3 className="text-white font-semibold text-lg mb-4">Order Items</h3>
+                        <div className="bg-surface border border-border rounded-[var(--radius)] p-6 shadow-[var(--shadow)]">
+                            <h3 className="text-text font-semibold text-lg mb-4">Order Items</h3>
                             <div className="space-y-4">
                                 {order.items.map((item, idx) => (
-                                    <div key={idx} className="flex justify-between items-start border-b border-white/5 pb-4 last:border-0 last:pb-0">
+                                    <div key={idx} className="flex justify-between items-start border-b border-border pb-4 last:border-0 last:pb-0">
                                         <div className="flex-1">
                                             <div className="flex items-center gap-3">
-                                                <span className="bg-white/10 text-white font-bold text-sm w-8 h-8 rounded-full flex items-center justify-center">
+                                                <span className="bg-surface-2 text-text font-bold text-sm w-8 h-8 rounded-full flex items-center justify-center border border-border">
                                                     {item.quantity}
                                                 </span>
-                                                <span className="text-white font-medium text-lg">{item.name}</span>
+                                                <span className="text-text font-medium text-lg">{item.name}</span>
                                             </div>
                                             {item.modifiers && item.modifiers.length > 0 && (
-                                                <p className="text-white/60 text-sm ml-11 mt-1">
+                                                <p className="text-muted text-sm ml-11 mt-1">
                                                     {item.modifiers.join(', ')}
                                                 </p>
                                             )}
                                             {item.notes && (
-                                                <p className="text-white/40 text-xs ml-11 mt-1 italic">
+                                                <p className="text-muted text-xs ml-11 mt-1 italic">
                                                     Note: {item.notes}
                                                 </p>
                                             )}
                                         </div>
-                                        <span className="text-white font-semibold text-lg">
+                                        <span className="text-text font-semibold text-lg">
                                             ${((item.price || 0) * (item.quantity || 0)).toFixed(2)}
                                         </span>
                                     </div>
@@ -188,40 +184,40 @@ export const OrderDetail: React.FC = () => {
                             </div>
 
                             {/* Totals */}
-                            <div className="border-t border-white/10 mt-6 pt-4 space-y-2">
-                                <div className="flex justify-between text-white/60 text-sm">
+                            <div className="border-t border-border mt-6 pt-4 space-y-2">
+                                <div className="flex justify-between text-muted text-sm">
                                     <span>Subtotal</span>
                                     <span>${(order.subtotal || 0).toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between text-white/60 text-sm">
+                                <div className="flex justify-between text-muted text-sm">
                                     <span>Tax</span>
                                     <span>${(order.tax || 0).toFixed(2)}</span>
                                 </div>
                                 {(order.tip || 0) > 0 && (
-                                    <div className="flex justify-between text-white/60 text-sm">
+                                    <div className="flex justify-between text-muted text-sm">
                                         <span>Tip</span>
                                         <span>${(order.tip || 0).toFixed(2)}</span>
                                     </div>
                                 )}
                                 {(order.delivery_fee || 0) > 0 && (
-                                    <div className="flex justify-between text-white/60 text-sm">
+                                    <div className="flex justify-between text-muted text-sm">
                                         <span>Delivery Fee</span>
                                         <span>${(order.delivery_fee || 0).toFixed(2)}</span>
                                     </div>
                                 )}
-                                <div className="flex justify-between text-white font-bold text-xl pt-2 border-t border-white/10">
+                                <div className="flex justify-between text-text font-bold text-xl pt-2 border-t border-border">
                                     <span>Total</span>
                                     <span>${(order.total || 0).toFixed(2)}</span>
                                 </div>
 
                                 {/* Stripe Financials */}
                                 {(order.stripe_net_amount !== undefined) && (
-                                    <div className="pt-4 mt-4 border-t border-white/10 space-y-2">
-                                        <div className="flex justify-between text-white/50 text-xs">
+                                    <div className="pt-4 mt-4 border-t border-border space-y-2">
+                                        <div className="flex justify-between text-muted text-xs">
                                             <span>Stripe Fee</span>
                                             <span>-${((order.stripe_fee_amount || 0) / 100).toFixed(2)}</span>
                                         </div>
-                                        <div className="flex justify-between text-green-400 font-bold text-sm">
+                                        <div className="flex justify-between text-green-600 font-bold text-sm">
                                             <span>Est. Payout</span>
                                             <span>${((order.stripe_net_amount || 0) / 100).toFixed(2)}</span>
                                         </div>
@@ -232,9 +228,9 @@ export const OrderDetail: React.FC = () => {
 
                         {/* Special Instructions */}
                         {order.special_instructions && (
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                                <h3 className="text-white font-semibold mb-2">Special Instructions</h3>
-                                <p className="text-white/80">{order.special_instructions}</p>
+                            <div className="bg-surface border border-border rounded-[var(--radius)] p-6 shadow-[var(--shadow)]">
+                                <h3 className="text-text font-semibold mb-2">Special Instructions</h3>
+                                <p className="text-text">{order.special_instructions}</p>
                             </div>
                         )}
 
@@ -244,8 +240,8 @@ export const OrderDetail: React.FC = () => {
 
                     {/* Sidebar - Actions */}
                     <div className="space-y-6">
-                        <div className="bg-neutral-800 border border-white/10 rounded-xl p-6 sticky top-20">
-                            <h3 className="text-white font-semibold mb-4">Actions</h3>
+                        <div className="bg-surface border border-border rounded-[var(--radius)] p-6 sticky top-20 shadow-[var(--shadow)]">
+                            <h3 className="text-text font-semibold mb-4">Actions</h3>
                             <StatusStepper
                                 currentStatus={order.status}
                                 orderId={order.id}

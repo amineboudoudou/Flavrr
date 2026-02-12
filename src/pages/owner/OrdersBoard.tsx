@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
 import { OrdersLane } from '../../components/owner/OrdersLane';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { Toast } from '../../components/Toast';
 import { useSound } from '../../hooks/useSound';
 import { useOrderRealtime } from '../../hooks/useOrderRealtime';
@@ -120,12 +121,10 @@ export const OrdersBoard: React.FC = () => {
     if (loading) {
         return (
             <OwnerLayout>
-                <div className="flex items-center justify-center h-[calc(100vh-64px)]">
-                    <div className="text-white text-center">
-                        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                        <p className="text-sm opacity-60">{!profile?.org_id ? 'Resolving organization...' : 'Loading orders...'}</p>
-                    </div>
-                </div>
+                <BrandedLoader
+                    fullPage
+                    message={!profile?.org_id ? 'Loading your dashboard…' : 'Loading orders…'}
+                />
             </OwnerLayout>
         );
     }
@@ -151,8 +150,8 @@ export const OrdersBoard: React.FC = () => {
             <div className="p-4 md:p-6">
                 {/* Header */}
                 <div className="mb-6">
-                    <h1 className="text-white text-2xl font-bold mb-2">Orders Board</h1>
-                    <p className="text-white/60 text-sm">
+                    <h1 className="text-text text-2xl font-bold mb-2">Orders</h1>
+                    <p className="text-muted text-sm">
                         Manage incoming orders and track their progress
                     </p>
                 </div>

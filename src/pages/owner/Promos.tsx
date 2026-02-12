@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
 import type { PromoCode } from '../../types';
 
@@ -73,12 +74,12 @@ export const Promos: React.FC = () => {
                 {/* Header */}
                 <div className="mb-8 flex justify-between items-center">
                     <div>
-                        <h1 className="text-3xl font-bold text-white mb-2">Promo Codes</h1>
-                        <p className="text-white/60">Create and manage promotional discounts</p>
+                        <h1 className="text-3xl font-bold text-text mb-2">Promos</h1>
+                        <p className="text-muted">Create and manage promotional discounts</p>
                     </div>
                     <button
                         onClick={() => setShowCreateForm(!showCreateForm)}
-                        className="px-6 py-3 bg-primary hover:bg-primary/90 text-white rounded-lg font-medium transition-colors"
+                        className="px-6 py-3 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors shadow-[var(--shadow)]"
                     >
                         {showCreateForm ? '✕ Cancel' : '+ New Promo'}
                     </button>
@@ -86,42 +87,42 @@ export const Promos: React.FC = () => {
 
                 {/* Create Form */}
                 {showCreateForm && (
-                    <form onSubmit={handleCreate} className="bg-white/5 border border-white/10 rounded-lg p-6 mb-6">
+                    <form onSubmit={handleCreate} className="bg-surface border border-border rounded-[var(--radius)] p-6 mb-6 shadow-[var(--shadow)]">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">Code *</label>
+                                <label className="block text-muted text-sm font-medium mb-2">Code *</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.code}
                                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                                     placeholder="WELCOME10"
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
                                 />
                             </div>
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">Description</label>
+                                <label className="block text-muted text-sm font-medium mb-2">Description</label>
                                 <input
                                     type="text"
                                     value={formData.description}
                                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                                     placeholder="10% off for new customers"
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
                                 />
                             </div>
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">Discount Type *</label>
+                                <label className="block text-muted text-sm font-medium mb-2">Discount Type *</label>
                                 <select
                                     value={formData.discount_type}
                                     onChange={(e) => setFormData({ ...formData, discount_type: e.target.value as any })}
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text focus:outline-none focus:border-primary"
                                 >
                                     <option value="percentage">Percentage</option>
                                     <option value="fixed_amount">Fixed Amount</option>
                                 </select>
                             </div>
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">
+                                <label className="block text-muted text-sm font-medium mb-2">
                                     Discount Value * {formData.discount_type === 'percentage' ? '(%)' : '($)'}
                                 </label>
                                 <input
@@ -130,33 +131,33 @@ export const Promos: React.FC = () => {
                                     min="1"
                                     value={formData.discount_value}
                                     onChange={(e) => setFormData({ ...formData, discount_value: parseInt(e.target.value) })}
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text focus:outline-none focus:border-primary"
                                 />
                             </div>
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">Min Order ($)</label>
+                                <label className="block text-muted text-sm font-medium mb-2">Min Order ($)</label>
                                 <input
                                     type="number"
                                     min="0"
                                     step="0.01"
                                     value={formData.min_order_cents / 100}
                                     onChange={(e) => setFormData({ ...formData, min_order_cents: Math.round(parseFloat(e.target.value) * 100) })}
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text focus:outline-none focus:border-primary"
                                 />
                             </div>
                             <div>
-                                <label className="block text-white/80 text-sm font-medium mb-2">Expires At</label>
+                                <label className="block text-muted text-sm font-medium mb-2">Expires At</label>
                                 <input
                                     type="datetime-local"
                                     value={formData.expires_at}
                                     onChange={(e) => setFormData({ ...formData, expires_at: e.target.value })}
-                                    className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary"
+                                    className="w-full px-4 py-2 bg-surface border border-border rounded-[var(--radius)] text-text focus:outline-none focus:border-primary"
                                 />
                             </div>
                         </div>
                         <button
                             type="submit"
-                            className="mt-4 px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+                            className="mt-4 px-6 py-2 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors"
                         >
                             Create Promo Code
                         </button>
@@ -171,7 +172,7 @@ export const Promos: React.FC = () => {
                             onClick={() => setFilter(status)}
                             className={`px-4 py-2 rounded-lg font-medium transition-colors ${filter === status
                                     ? 'bg-primary text-white'
-                                    : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                                    : 'bg-surface text-muted hover:bg-surface-2 hover:text-text border border-border'
                                 }`}
                         >
                             {status.charAt(0).toUpperCase() + status.slice(1)}
@@ -181,38 +182,40 @@ export const Promos: React.FC = () => {
 
                 {/* Promos List */}
                 {loading ? (
-                    <div className="text-center py-12 text-white/60">Loading promos...</div>
+                    <div className="py-12">
+                        <BrandedLoader message="Loading promos…" />
+                    </div>
                 ) : promos.length === 0 ? (
-                    <div className="text-center py-12 text-white/60">No promo codes found</div>
+                    <div className="text-center py-12 text-muted">No promo codes found</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {promos.map((promo) => (
                             <div
                                 key={promo.id}
-                                className="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/[0.07] transition-colors"
+                                className="bg-surface border border-border rounded-[var(--radius)] p-6 hover:bg-surface-2 transition-colors shadow-[var(--shadow)]"
                             >
                                 <div className="flex justify-between items-start mb-4">
                                     <div>
                                         <div className="text-2xl font-bold text-primary mb-1">{promo.code}</div>
                                         {promo.description && (
-                                            <p className="text-white/60 text-sm">{promo.description}</p>
+                                            <p className="text-muted text-sm">{promo.description}</p>
                                         )}
                                     </div>
                                     <button
                                         onClick={() => handleToggleActive(promo.id, promo.is_active)}
                                         className={`px-3 py-1 rounded-full text-xs font-medium ${promo.is_active
-                                                ? 'bg-green-500/20 text-green-400'
-                                                : 'bg-red-500/20 text-red-400'
+                                                ? 'bg-green-500/10 text-green-700 border border-green-200'
+                                                : 'bg-red-500/10 text-red-700 border border-red-200'
                                             }`}
                                     >
                                         {promo.is_active ? 'Active' : 'Inactive'}
                                     </button>
                                 </div>
 
-                                <div className="space-y-2 mb-4">
+                                <div className="space-y-3">
                                     <div className="flex justify-between">
-                                        <span className="text-white/60 text-sm">Discount</span>
-                                        <span className="text-white font-medium">
+                                        <span className="text-muted text-sm">Discount</span>
+                                        <span className="text-text font-medium">
                                             {promo.discount_type === 'percentage'
                                                 ? `${promo.discount_value}%`
                                                 : formatCurrency(promo.discount_value)}
@@ -220,20 +223,16 @@ export const Promos: React.FC = () => {
                                     </div>
                                     {promo.min_order_cents > 0 && (
                                         <div className="flex justify-between">
-                                            <span className="text-white/60 text-sm">Min Order</span>
-                                            <span className="text-white/80 text-sm">{formatCurrency(promo.min_order_cents)}</span>
+                                            <span className="text-muted text-sm">Min Order</span>
+                                            <span className="text-text text-sm">
+                                                {formatCurrency(promo.min_order_cents)}
+                                            </span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between">
-                                        <span className="text-white/60 text-sm">Uses</span>
-                                        <span className="text-white/80 text-sm">
-                                            {promo.current_uses} {promo.max_uses ? `/ ${promo.max_uses}` : ''}
-                                        </span>
-                                    </div>
                                     {promo.expires_at && (
                                         <div className="flex justify-between">
-                                            <span className="text-white/60 text-sm">Expires</span>
-                                            <span className="text-white/80 text-sm">
+                                            <span className="text-muted text-sm">Expires</span>
+                                            <span className="text-text text-sm">
                                                 {new Date(promo.expires_at).toLocaleDateString()}
                                             </span>
                                         </div>
@@ -241,9 +240,9 @@ export const Promos: React.FC = () => {
                                 </div>
 
                                 {promo.total_discount_given_cents > 0 && (
-                                    <div className="pt-4 border-t border-white/10">
-                                        <div className="text-white/60 text-xs mb-1">Total Discount Given</div>
-                                        <div className="text-green-400 font-bold">{formatCurrency(promo.total_discount_given_cents)}</div>
+                                    <div className="pt-4 border-t border-border">
+                                        <div className="text-muted text-xs mb-1">Total Discount Given</div>
+                                        <div className="text-text font-bold">{formatCurrency(promo.total_discount_given_cents)}</div>
                                     </div>
                                 )}
                             </div>

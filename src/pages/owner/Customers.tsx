@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
+import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
 import type { Customer } from '../../types';
 
@@ -78,8 +79,8 @@ export const Customers: React.FC = () => {
             <div className="p-6 max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-white mb-2">Customers</h1>
-                    <p className="text-white/60">View and manage your customer base</p>
+                    <h1 className="text-3xl font-bold text-text mb-2">Customers</h1>
+                    <p className="text-muted">View and manage your customer base</p>
                 </div>
 
                 {/* Search and Filters */}
@@ -89,12 +90,12 @@ export const Customers: React.FC = () => {
                         placeholder="Search by name, email, or phone..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="flex-1 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-primary"
+                        className="flex-1 px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary shadow-[var(--shadow)]"
                     />
                     <select
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value as any)}
-                        className="px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-primary"
+                        className="px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text focus:outline-none focus:border-primary shadow-[var(--shadow)]"
                     >
                         <option value="last_order_at">Recent Orders</option>
                         <option value="total_spent">Total Spent</option>
@@ -103,7 +104,7 @@ export const Customers: React.FC = () => {
                     <button
                         onClick={handleExportCSV}
                         disabled={exporting}
-                        className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        className="px-6 py-3 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shadow-[var(--shadow)]"
                     >
                         {exporting ? 'Exporting...' : 'Export Marketing CSV'}
                     </button>
@@ -111,62 +112,64 @@ export const Customers: React.FC = () => {
 
                 {/* Customers List */}
                 {loading ? (
-                    <div className="text-center py-12 text-white/60">Loading customers...</div>
+                    <div className="py-12">
+                        <BrandedLoader message="Loading customers…" />
+                    </div>
                 ) : customers.length === 0 ? (
-                    <div className="text-center py-12 text-white/60">No customers found</div>
+                    <div className="text-center py-12 text-muted">No customers found</div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {customers.map((customer) => (
                             <div
                                 key={customer.id}
                                 onClick={() => navigate(`/owner/customers/${customer.id}`)}
-                                className="bg-white/5 border border-white/10 rounded-lg p-6 hover:bg-white/[0.07] hover:border-primary/50 cursor-pointer transition-all active:scale-[0.98]"
+                                className="bg-surface border border-border rounded-[var(--radius)] p-6 hover:bg-surface-2 hover:border-primary/40 cursor-pointer transition-all active:scale-[0.98] shadow-[var(--shadow)]"
                             >
                                 <div className="flex items-start gap-4 mb-4">
-                                    <div className="w-12 h-12 rounded-full bg-primary/20 border-2 border-primary flex items-center justify-center flex-shrink-0">
+                                    <div className="w-12 h-12 rounded-full bg-surface-2 border border-border flex items-center justify-center flex-shrink-0">
                                         <span className="text-primary font-bold text-lg">
                                             {(customer.first_name || customer.email || 'U').charAt(0).toUpperCase()}
                                         </span>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="text-white font-medium truncate">{getCustomerName(customer)}</h3>
+                                            <h3 className="text-text font-medium truncate">{getCustomerName(customer)}</h3>
                                             {customer.marketing_opt_in && (
-                                                <span className="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs rounded-full border border-green-500/30 whitespace-nowrap">
-                                                    📧 Opted-in
+                                                <span className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded-full border border-primary/20 whitespace-nowrap">
+                                                    Opted-in
                                                 </span>
                                             )}
                                         </div>
                                         {customer.email && (
-                                            <p className="text-white/60 text-sm truncate">{customer.email}</p>
+                                            <p className="text-muted text-sm truncate">{customer.email}</p>
                                         )}
                                         {customer.phone && (
-                                            <p className="text-white/60 text-sm">{customer.phone}</p>
+                                            <p className="text-muted text-sm">{customer.phone}</p>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="space-y-2">
                                     <div className="flex justify-between items-center">
-                                        <span className="text-white/60 text-sm">Total Orders</span>
-                                        <span className="text-white font-medium">{customer.total_orders}</span>
+                                        <span className="text-muted text-sm">Total Orders</span>
+                                        <span className="text-text font-medium">{customer.total_orders}</span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-white/60 text-sm">Total Spent</span>
-                                        <span className="text-green-400 font-medium">
+                                        <span className="text-muted text-sm">Total Spent</span>
+                                        <span className="text-text font-medium">
                                             {formatCurrency(customer.total_spent_cents)}
                                         </span>
                                     </div>
                                     <div className="flex justify-between items-center">
-                                        <span className="text-white/60 text-sm">Avg Order</span>
-                                        <span className="text-white/80 font-medium">
+                                        <span className="text-muted text-sm">Avg Order</span>
+                                        <span className="text-text font-medium">
                                             {formatCurrency(customer.average_order_cents)}
                                         </span>
                                     </div>
                                     {customer.last_order_at && (
-                                        <div className="flex justify-between items-center pt-2 border-t border-white/10">
-                                            <span className="text-white/60 text-sm">Last Order</span>
-                                            <span className="text-white/80 text-sm">
+                                        <div className="flex justify-between items-center pt-2 border-t border-border">
+                                            <span className="text-muted text-sm">Last Order</span>
+                                            <span className="text-text text-sm">
                                                 {new Date(customer.last_order_at).toLocaleDateString()}
                                             </span>
                                         </div>

@@ -8,34 +8,34 @@ interface BadgeProps {
 }
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
-    draft: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
-    awaiting_payment: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    paid: 'bg-green-500/20 text-green-300 border-green-500/30',
-    accepted: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    preparing: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    ready: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    out_for_delivery: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-    completed: 'bg-green-600/20 text-green-400 border-green-600/30',
-    canceled: 'bg-red-500/20 text-red-300 border-red-500/30',
-    refunded: 'bg-red-600/20 text-red-400 border-red-600/30',
+    draft: 'bg-gray-500/10 text-gray-700 border-gray-200',
+    awaiting_payment: 'bg-yellow-500/10 text-yellow-700 border-yellow-200',
+    paid: 'bg-green-500/10 text-green-700 border-green-200',
+    accepted: 'bg-blue-500/10 text-blue-700 border-blue-200',
+    preparing: 'bg-orange-500/10 text-orange-700 border-orange-200',
+    ready: 'bg-purple-500/10 text-purple-700 border-purple-200',
+    out_for_delivery: 'bg-indigo-500/10 text-indigo-700 border-indigo-200',
+    completed: 'bg-green-600/10 text-green-800 border-green-200',
+    canceled: 'bg-red-500/10 text-red-700 border-red-200',
+    refunded: 'bg-red-600/10 text-red-800 border-red-200',
 };
 
 const FULFILLMENT_COLORS: Record<FulfillmentType, string> = {
-    pickup: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    delivery: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    pickup: 'bg-blue-500/10 text-blue-700 border-blue-200',
+    delivery: 'bg-purple-500/10 text-purple-700 border-purple-200',
 };
 
 const ROLE_COLORS: Record<UserRole, string> = {
-    owner: 'bg-pink-500/20 text-pink-300 border-pink-500/30',
-    manager: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    kitchen: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    admin: 'bg-red-500/20 text-red-300 border-red-500/30',
+    owner: 'bg-orange-500/10 text-orange-700 border-orange-200',
+    manager: 'bg-purple-500/10 text-purple-700 border-purple-200',
+    kitchen: 'bg-blue-500/10 text-blue-700 border-blue-200',
+    admin: 'bg-red-500/10 text-red-700 border-red-200',
 };
 
 export const Badge: React.FC<BadgeProps> = ({ variant = 'default', children, className = '' }) => {
     const baseClasses = 'inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border';
 
-    let colorClasses = 'bg-white/10 text-white/70 border-white/20';
+    let colorClasses = 'bg-surface-2 text-muted border-border';
 
     if (variant === 'status' && typeof children === 'string') {
         colorClasses = STATUS_COLORS[children as OrderStatus] || colorClasses;
