@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useLocation, useParams } from 'react-router-dom';
 import { MenuItem, CartItem, Category, Language, OrganizationProfile, CheckoutStep } from './types';
 import { MENU_ITEMS, CATEGORIES, UI_STRINGS } from './constants';
 import { Header } from './components/Header';
@@ -19,6 +20,8 @@ import { useImagePreload } from './hooks/useImagePreload';
 import { api } from './lib/api';
 
 const Storefront: React.FC = () => {
+    const { slug } = useParams();
+    const location = useLocation();
     const [lang, setLang] = useState<Language>('fr');
     const [categories, setCategories] = useState<Category[]>([]);
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -39,7 +42,7 @@ const Storefront: React.FC = () => {
     const [selectedItemForDetails, setSelectedItemForDetails] = useState<MenuItem | null>(null);
     const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
-    const ORG_ID = '00000000-0000-0000-0000-000000000001';
+    const [lastDeepLinkedItemId, setLastDeepLinkedItemId] = useState<string>('');
 
     useEffect(() => {
         let isMounted = true;
@@ -48,7 +51,8 @@ const Storefront: React.FC = () => {
             try {
                 if (isMounted) setLoading(true);
 
-                const response = await api.publicGetMenu('cafe-du-griot');
+                const orgSlug = slug || 'cafe-du-griot';
+                const response = await api.publicGetMenu(orgSlug);
 
                 console.log(`✅ Loaded ${response.menu.length} categories.`);
 
@@ -85,7 +89,7 @@ const Storefront: React.FC = () => {
         };
         loadMenu();
         return () => { isMounted = false; };
-    }, []);
+    }, [slug]);
 
     const filteredItems = useMemo(() => {
         if (!activeCategory) return [];
@@ -150,6 +154,27 @@ const Storefront: React.FC = () => {
         setSelectedItemForDetails(item);
         setIsDetailsOpen(true);
     };
+
+    useEffect(() => {
+        const searchParams = new URLSearchParams(location.search);
+        const itemId = searchParams.get('item') || '';
+        if (!itemId) return;
+        if (!menuItems.length) return;
+        if (itemId === lastDeepLinkedItemId) return;
+
+        const item = menuItems.find((i) => i.id === itemId);
+        if (!item) return;
+
+        console.log(`🔗 Deep link item detected: ${itemId}`);
+        setLastDeepLinkedItemId(itemId);
+        setActiveCategory(item.category);
+
+        // Delay to allow UI to switch category before opening the modal
+        setTimeout(() => {
+            handleOpenDetails(item);
+            scrollToSection('menu');
+        }, 0);
+    }, [location.search, menuItems, lastDeepLinkedItemId]);
 
     const handleJumpToIndex = (index: number) => {
         setCurrentIndex(index);

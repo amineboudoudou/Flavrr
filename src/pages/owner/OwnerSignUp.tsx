@@ -198,7 +198,7 @@ export const OwnerSignUp: React.FC = () => {
                     <div className="mt-6 text-center">
                         <p className="text-gray-600 text-sm">
                             Already have an account?{' '}
-                            <Link to="/owner/login" className="text-orange-600 hover:text-orange-700 font-semibold">
+                            <Link to="/login" className="text-orange-600 hover:text-orange-700 font-semibold">
                                 Sign In
                             </Link>
                         </p>

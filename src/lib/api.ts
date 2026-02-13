@@ -125,7 +125,7 @@ async function fetchWithAuth<T>(
                 supabase.auth.signOut().catch(() => { });
 
                 // Force hard redirect to clear any stale state
-                window.location.href = '/owner/login';
+                window.location.href = '/login';
 
                 // Throw so the caller doesn't hang
                 throw new ApiError('Unauthorized - Redirecting...', 'UNAUTHORIZED', 401);
@@ -226,6 +226,20 @@ export async function updateOrderStatus(
         body: { order_id: orderId, new_status: status },
     });
     return response.order;
+}
+
+export async function deleteOrder(orderId: string): Promise<void> {
+    await fetchWithAuth('owner_delete_order', {
+        method: 'POST',
+        body: { order_id: orderId },
+    });
+}
+
+export async function bulkDeleteOrders(orderIds: string[]): Promise<{ deleted: number }> {
+    return fetchWithAuth<{ deleted: number }>('owner_bulk_delete_orders', {
+        method: 'POST',
+        body: { order_ids: orderIds },
+    });
 }
 
 // ============================================
@@ -680,6 +694,8 @@ export const api = {
     listOrders,
     getOrder,
     updateOrderStatus,
+    deleteOrder,
+    bulkDeleteOrders,
 
     // Delivery
     getUberQuote,

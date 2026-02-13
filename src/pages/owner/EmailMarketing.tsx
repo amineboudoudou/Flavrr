@@ -1,17 +1,116 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
 import { api } from '../../lib/api';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 export const EmailMarketing: React.FC = () => {
+    const { activeWorkspace } = useWorkspace();
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
-        html_content: '',
+        message: '',
         min_orders: 0,
         test_email: '',
     });
+    const [menuItems, setMenuItems] = useState<any[]>([]);
+    const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+    const [productSearch, setProductSearch] = useState('');
     const [sending, setSending] = useState(false);
     const [message, setMessage] = useState('');
+
+    useEffect(() => {
+        let mounted = true;
+        const loadItems = async () => {
+            try {
+                const items = await api.ownerListMenuItems();
+                if (mounted) setMenuItems(items || []);
+            } catch (e) {
+                console.error('Failed to load menu items:', e);
+            }
+        };
+        loadItems();
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
+    const selectedProducts = useMemo(() => {
+        const byId = new Map(menuItems.map((i) => [i.id, i]));
+        return selectedProductIds.map((id) => byId.get(id)).filter(Boolean);
+    }, [menuItems, selectedProductIds]);
+
+    const escapeHtml = (input: string) =>
+        input
+            .replaceAll('&', '&amp;')
+            .replaceAll('<', '&lt;')
+            .replaceAll('>', '&gt;')
+            .replaceAll('"', '&quot;')
+            .replaceAll("'", '&#39;');
+
+    const formatMessageToHtml = (input: string) => {
+        const trimmed = (input || '').trim();
+        if (!trimmed) return '';
+        const paragraphs = trimmed
+            .split(/\n\s*\n/g)
+            .map((p) => p.trim())
+            .filter(Boolean)
+            .map((p) => `<p style="margin: 0 0 12px; line-height: 1.6;">${escapeHtml(p).replaceAll('\n', '<br/>')}</p>`)
+            .join('');
+        return paragraphs;
+    };
+
+    const storefrontBaseUrl = useMemo(() => {
+        const origin = typeof window !== 'undefined' ? window.location.origin : '';
+        const slug = activeWorkspace?.slug;
+        if (!origin || !slug) return '';
+        return `${origin}/order/${slug}`;
+    }, [activeWorkspace?.slug]);
+
+    const buildEmailHtml = () => {
+        const bodyHtml = formatMessageToHtml(formData.message);
+        const productsHtml = selectedProducts.length
+            ? `
+                <div style="margin-top: 20px;">
+                    <h2 style="font-size: 16px; margin: 0 0 12px;">Featured items</h2>
+                    <div>
+                        ${selectedProducts
+                            .map((p: any) => {
+                                const href = storefrontBaseUrl ? `${storefrontBaseUrl}?item=${encodeURIComponent(p.id)}` : '';
+                                const title = escapeHtml(p.name_en || p.name_fr || 'Item');
+                                const price = typeof p.price_cents === 'number' ? `$${(p.price_cents / 100).toFixed(2)}` : '';
+                                const img = p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="${title}" style="width: 100%; max-width: 520px; border-radius: 12px; display: block;"/>` : '';
+                                const cta = href
+                                    ? `<a href="${href}" style="display: inline-block; margin-top: 10px; background: #f97316; color: #ffffff; text-decoration: none; padding: 10px 14px; border-radius: 10px; font-weight: 600;">Order now</a>`
+                                    : '';
+                                return `
+                                    <div style="border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; margin-bottom: 12px;">
+                                        ${img}
+                                        <div style="margin-top: 10px;">
+                                            <div style="font-size: 16px; font-weight: 700;">${title}</div>
+                                            ${price ? `<div style="color: #6b7280; margin-top: 4px;">${price}</div>` : ''}
+                                            ${cta}
+                                        </div>
+                                    </div>
+                                `;
+                            })
+                            .join('')}
+                    </div>
+                </div>
+            `
+            : '';
+
+        const brand = escapeHtml(activeWorkspace?.name || '');
+        return `
+            <div style="background: #ffffff; padding: 20px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color: #111827;">
+                <div style="max-width: 640px; margin: 0 auto;">
+                    ${brand ? `<div style="font-size: 13px; color: #6b7280; margin-bottom: 10px;">${brand}</div>` : ''}
+                    ${bodyHtml}
+                    ${productsHtml}
+                    ${storefrontBaseUrl ? `<div style="margin-top: 18px;"><a href="${storefrontBaseUrl}" style="color: #2563eb; text-decoration: none;">View full menu</a></div>` : ''}
+                </div>
+            </div>
+        `.trim();
+    };
 
     const handleSendTest = async () => {
         if (!formData.test_email) {
@@ -25,7 +124,7 @@ export const EmailMarketing: React.FC = () => {
             await api.sendEmailCampaign({
                 name: formData.name || 'Test Campaign',
                 subject: formData.subject,
-                html_content: formData.html_content,
+                html_content: buildEmailHtml(),
                 test_email: formData.test_email,
             });
             setMessage('✓ Test email sent successfully!');
@@ -38,7 +137,7 @@ export const EmailMarketing: React.FC = () => {
     };
 
     const handleSendCampaign = async () => {
-        if (!formData.name || !formData.subject || !formData.html_content) {
+        if (!formData.name || !formData.subject || !formData.message) {
             alert('Please fill in all required fields');
             return;
         }
@@ -53,7 +152,7 @@ export const EmailMarketing: React.FC = () => {
             const result = await api.sendEmailCampaign({
                 name: formData.name,
                 subject: formData.subject,
-                html_content: formData.html_content,
+                html_content: buildEmailHtml(),
                 recipient_filter: {
                     min_orders: formData.min_orders || undefined,
                     email_marketing_consent: true,
@@ -63,10 +162,11 @@ export const EmailMarketing: React.FC = () => {
             setFormData({
                 name: '',
                 subject: '',
-                html_content: '',
+                message: '',
                 min_orders: 0,
                 test_email: '',
             });
+            setSelectedProductIds([]);
         } catch (error: any) {
             console.error('Error sending campaign:', error);
             setMessage(`✗ Error: ${error.message}`);
@@ -119,19 +219,107 @@ export const EmailMarketing: React.FC = () => {
 
                         <div>
                             <label className="block text-muted text-sm font-medium mb-2">
-                                Email Content (HTML) *
+                                Email message *
                             </label>
                             <textarea
-                                value={formData.html_content}
-                                onChange={(e) => setFormData({ ...formData, html_content: e.target.value })}
-                                placeholder="<h1>Hello!</h1><p>We have a special offer for you...</p>"
+                                value={formData.message}
+                                onChange={(e) => setFormData({ ...formData, message: e.target.value })}
+                                placeholder="Write your message here...\n\nExample: Hey! We have a special offer for you this week."
                                 rows={10}
-                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary font-mono text-sm"
+                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary text-sm"
                                 disabled={sending}
                             />
                             <p className="text-muted text-xs mt-2">
-                                Tip: Use HTML for formatting. Include images with full URLs.
+                                Use new lines to separate paragraphs. Products you select below will be added automatically with “Order now” links.
                             </p>
+                        </div>
+
+                        <div className="bg-surface-2 border border-border rounded-[var(--radius)] p-4">
+                            <div className="flex items-center justify-between gap-4 mb-3">
+                                <div>
+                                    <div className="text-text font-semibold">Featured products</div>
+                                    <div className="text-muted text-xs">Pick items to include in the email with clickable links</div>
+                                </div>
+                                <div className="text-muted text-xs">
+                                    {selectedProductIds.length} selected
+                                </div>
+                            </div>
+
+                            <input
+                                type="text"
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                placeholder="Search products..."
+                                className="w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary text-sm"
+                                disabled={sending}
+                            />
+
+                            <div className="mt-3 max-h-56 overflow-auto divide-y divide-border border border-border rounded-[var(--radius)] bg-surface">
+                                {menuItems
+                                    .filter((item) => {
+                                        if (!productSearch.trim()) return true;
+                                        const q = productSearch.trim().toLowerCase();
+                                        const name = `${item?.name_en || ''} ${item?.name_fr || ''}`.toLowerCase();
+                                        return name.includes(q);
+                                    })
+                                    .slice(0, 100)
+                                    .map((item) => {
+                                        const checked = selectedProductIds.includes(item.id);
+                                        return (
+                                            <label key={item.id} className="flex items-center gap-3 px-3 py-2 text-sm text-text cursor-pointer hover:bg-surface-2">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={checked}
+                                                    onChange={(e) => {
+                                                        const next = e.target.checked
+                                                            ? Array.from(new Set([...selectedProductIds, item.id]))
+                                                            : selectedProductIds.filter((id) => id !== item.id);
+                                                        setSelectedProductIds(next);
+                                                    }}
+                                                    disabled={sending}
+                                                />
+                                                <span className="flex-1">
+                                                    {item.name_en || item.name_fr || 'Untitled'}
+                                                </span>
+                                                {typeof item.price_cents === 'number' && (
+                                                    <span className="text-muted">${(item.price_cents / 100).toFixed(2)}</span>
+                                                )}
+                                            </label>
+                                        );
+                                    })}
+                                {menuItems.length === 0 && (
+                                    <div className="px-3 py-3 text-sm text-muted">No products found.</div>
+                                )}
+                            </div>
+
+                            {!activeWorkspace?.slug && (
+                                <div className="mt-3 text-xs text-muted">
+                                    Product links will appear after you select a workspace.
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="bg-surface border border-border rounded-[var(--radius)] p-4">
+                                <div className="text-text font-semibold mb-2">Preview</div>
+                                <div className="text-muted text-xs mb-3">
+                                    This is what customers will see in their inbox.
+                                </div>
+                                <div className="border border-border rounded-[var(--radius)] bg-white p-4 overflow-auto max-h-80">
+                                    <div
+                                        dangerouslySetInnerHTML={{ __html: buildEmailHtml() }}
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="bg-surface border border-border rounded-[var(--radius)] p-4">
+                                <div className="text-text font-semibold mb-2">Quick tips</div>
+                                <div className="text-muted text-sm space-y-2">
+                                    <div>Keep it short and include one clear call-to-action.</div>
+                                    <div>Use “Send test email” first to verify the links.</div>
+                                    <div>Featuring 1–3 products usually converts better than a long list.</div>
+                                </div>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -176,14 +364,14 @@ export const EmailMarketing: React.FC = () => {
                     <div className="flex gap-4 mt-6">
                         <button
                             onClick={handleSendTest}
-                            disabled={sending || !formData.subject || !formData.html_content}
+                            disabled={sending || !formData.subject || !formData.message}
                             className="px-6 py-3 bg-surface text-text border border-border rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:bg-surface-2"
                         >
                             {sending ? 'Sending...' : '📧 Send Test Email'}
                         </button>
                         <button
                             onClick={handleSendCampaign}
-                            disabled={sending || !formData.name || !formData.subject || !formData.html_content}
+                            disabled={sending || !formData.name || !formData.subject || !formData.message}
                             className="px-6 py-3 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-[var(--shadow)]"
                         >
                             {sending ? 'Sending...' : '🚀 Send Campaign'}

@@ -9,6 +9,9 @@ interface OrdersLaneProps {
     onOrderClick: (order: Order) => void;
     onQuickAction?: (order: Order) => void;
     quickActionLabel?: string;
+    selectedIds?: Set<string>;
+    onToggleSelect?: (id: string) => void;
+    isSelecting?: boolean;
 }
 
 export const OrdersLane: React.FC<OrdersLaneProps> = ({
@@ -18,6 +21,9 @@ export const OrdersLane: React.FC<OrdersLaneProps> = ({
     onOrderClick,
     onQuickAction,
     quickActionLabel,
+    selectedIds,
+    onToggleSelect,
+    isSelecting,
 }) => {
     return (
         <div className="flex flex-col min-w-[320px] md:min-w-[360px] flex-1">
@@ -43,6 +49,9 @@ export const OrdersLane: React.FC<OrdersLaneProps> = ({
                             onClick={() => onOrderClick(order)}
                             onQuickAction={onQuickAction ? () => onQuickAction(order) : undefined}
                             quickActionLabel={quickActionLabel}
+                            isSelected={selectedIds?.has(order.id) || false}
+                            onToggleSelect={onToggleSelect ? () => onToggleSelect(order.id) : undefined}
+                            isSelecting={isSelecting || false}
                         />
                     ))
                 )}

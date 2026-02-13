@@ -8,9 +8,12 @@ interface OrderCardProps {
     onClick: () => void;
     onQuickAction?: () => void;
     quickActionLabel?: string;
+    isSelected?: boolean;
+    onToggleSelect?: () => void;
+    isSelecting?: boolean;
 }
 
-export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAction, quickActionLabel }) => {
+export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAction, quickActionLabel, isSelected, onToggleSelect, isSelecting }) => {
     // "New" glow if order is less than 60 seconds old
     const isNew = useMemo(() => {
         const now = new Date().getTime();
@@ -35,14 +38,35 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
 
     return (
         <div
-            className={`bg-surface border rounded-[var(--radius)] p-4 cursor-pointer transition-all hover:border-primary/40 hover:bg-surface-2 shadow-[var(--shadow)] ${isNew
+            className={`relative bg-surface border rounded-[var(--radius)] p-4 cursor-pointer transition-all hover:border-primary/40 hover:bg-surface-2 shadow-[var(--shadow)] ${isNew
                 ? 'border-primary/30'
-                : 'border-border'
+                : isSelected
+                    ? 'border-primary ring-2 ring-primary/20'
+                    : 'border-border'
                 }`}
             onClick={onClick}
         >
+            {/* Selection checkbox */}
+            {isSelecting && onToggleSelect && (
+                <button
+                    onClick={(e) => { e.stopPropagation(); onToggleSelect(); }}
+                    className="absolute top-3 left-3 z-10"
+                >
+                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${isSelected
+                        ? 'bg-primary border-primary'
+                        : 'bg-white border-gray-300 hover:border-primary'
+                    }`}>
+                        {isSelected && (
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                        )}
+                    </div>
+                </button>
+            )}
+
             {/* Header: Order # + Time */}
-            <div className="flex items-start justify-between mb-3">
+            <div className={`flex items-start justify-between mb-3 ${isSelecting ? 'pl-7' : ''}`}>
                 <div>
                     <h4 className="text-text font-semibold text-lg">
                         #{order.order_number.toString().padStart(4, '0')}
@@ -79,7 +103,7 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
                 <span className="text-text font-bold text-lg">${(order.total || 0).toFixed(2)}</span>
 
                 {/* Quick Action Button */}
-                {onQuickAction && quickActionLabel && (
+                {onQuickAction && quickActionLabel && !isSelecting && (
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -93,7 +117,7 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
             </div>
 
             {/* "New" Indicator */}
-            {isNew && (
+            {isNew && !isSelecting && (
                 <div className="absolute top-2 right-2">
                     <span className="bg-primary text-white text-[10px] font-bold px-2 py-1 rounded-full">
                         NEW

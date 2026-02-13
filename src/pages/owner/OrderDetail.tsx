@@ -8,12 +8,18 @@ import { StatusStepper } from '../../components/owner/StatusStepper';
 import { DeliveryPanel } from '../../components/owner/DeliveryPanel';
 import { DeliveryStatus } from '../../components/owner/DeliveryStatus';
 import { ChevronLeft } from '../../components/Icons';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { Trash2 } from 'lucide-react';
 import type { Order } from '../../types';
 import { api } from '../../lib/api';
 
 export const OrderDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { activeWorkspace } = useWorkspace();
+    const slug = activeWorkspace?.slug || '';
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [deleteLoading, setDeleteLoading] = useState(false);
 
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
@@ -88,8 +94,8 @@ export const OrderDetail: React.FC = () => {
                     <div className="text-center">
                         <p className="text-red-400 mb-4">{error || 'Order not found'}</p>
                         <button
-                            onClick={() => navigate('/owner')}
-                            className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-lg transition-colors"
+                            onClick={() => navigate(`/app/${slug}/orders`)}
+                            className="bg-primary hover:bg-accent text-white px-6 py-2 rounded-xl transition-colors"
                         >
                             Back to Orders
                         </button>
@@ -104,7 +110,7 @@ export const OrderDetail: React.FC = () => {
             <div className="p-4 md:p-6 max-w-6xl mx-auto">
                 {/* Back Button */}
                 <button
-                    onClick={() => navigate('/owner')}
+                    onClick={() => navigate(`/app/${slug}/orders`)}
                     className="flex items-center gap-2 text-muted hover:text-text mb-6 transition-colors"
                 >
                     <ChevronLeft className="w-4 h-4" />
@@ -253,9 +259,60 @@ export const OrderDetail: React.FC = () => {
 
                         {/* Delivery Status */}
                         <DeliveryStatus order={order} />
+
+                        {/* Delete Order */}
+                        <div className="bg-surface border border-border rounded-[var(--radius)] p-6 shadow-[var(--shadow)]">
+                            <h3 className="text-text font-semibold mb-2">Danger zone</h3>
+                            <p className="text-muted text-sm mb-4">Permanently delete this order and all associated data.</p>
+                            <button
+                                onClick={() => setShowDeleteConfirm(true)}
+                                className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition-colors w-full justify-center"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                                Delete order
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl border border-gray-200 shadow-xl p-6 max-w-sm w-full mx-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-2">Delete this order?</h3>
+                        <p className="text-gray-500 text-sm mb-6">
+                            Order #{order.order_number.toString().padStart(4, '0')} will be permanently deleted. This cannot be undone.
+                        </p>
+                        <div className="flex gap-3 justify-end">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setDeleteLoading(true);
+                                    try {
+                                        await api.deleteOrder(order.id);
+                                        navigate(`/app/${slug}/orders`);
+                                    } catch (err: any) {
+                                        console.error('Delete failed:', err);
+                                        setShowDeleteConfirm(false);
+                                    } finally {
+                                        setDeleteLoading(false);
+                                    }
+                                }}
+                                disabled={deleteLoading}
+                                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors disabled:opacity-50"
+                            >
+                                {deleteLoading ? 'Deleting…' : 'Delete'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </OwnerLayout >
     );
 };

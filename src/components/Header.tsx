@@ -77,7 +77,7 @@ export const Header: React.FC<Props> = ({
           </button>
 
           <a
-            href="/owner/login"
+            href="/login"
             className="flex items-center gap-2 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white md:px-4 p-2 md:py-2 rounded-full border border-white/10 transition-all text-[10px] font-bold uppercase tracking-widest"
             title="Owner Portal"
           >

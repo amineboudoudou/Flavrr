@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
 import { BrandedLoader } from '../../components/owner/BrandedLoader';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { api } from '../../lib/api';
 import type { CustomerDetails, Order } from '../../types';
 
 export const CustomerDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { activeWorkspace } = useWorkspace();
+    const slug = activeWorkspace?.slug || '';
     const [customer, setCustomer] = useState<CustomerDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -66,7 +69,7 @@ export const CustomerDetail: React.FC = () => {
                 <div className="p-6 text-center">
                     <div className="text-red-400 mb-4">{error || 'Customer not found'}</div>
                     <button
-                        onClick={() => navigate('/owner/customers')}
+                        onClick={() => navigate(`/app/${slug}/customers`)}
                         className="text-primary hover:underline"
                     >
                         ← Back to Customers
@@ -82,7 +85,7 @@ export const CustomerDetail: React.FC = () => {
                 {/* Header with Back Button */}
                 <div className="mb-8">
                     <button
-                        onClick={() => navigate('/owner/customers')}
+                        onClick={() => navigate(`/app/${slug}/customers`)}
                         className="text-muted hover:text-text mb-4 flex items-center gap-2 transition-colors"
                     >
                         <span>←</span> Back to Customers
