@@ -39,41 +39,9 @@ export const WorkspaceHome: React.FC = () => {
         }
     ];
 
-    const metrics = [
-        {
-            label: "Today's Orders",
-            value: '18',
-            delta: '+12% vs yesterday'
-        },
-        {
-            label: 'Revenue',
-            value: '$1,240',
-            delta: '+8% vs last week'
-        },
-        {
-            label: 'Avg. Ticket',
-            value: '$28.10',
-            delta: '+4% this week'
-        },
-        {
-            label: 'Repeat Customers',
-            value: '42%',
-            delta: '+6 new loyal fans'
-        }
-    ];
-
-    const recentOrders = [
-        { id: '#1023', customer: 'Mara Jay', total: '$48.20', status: 'Preparing', time: '2m ago' },
-        { id: '#1022', customer: 'Leo Park', total: '$24.10', status: 'Ready', time: '12m ago' },
-        { id: '#1021', customer: 'Sofia Ibarra', total: '$36.40', status: 'Delivered', time: '27m ago' },
-        { id: '#1020', customer: 'Basil Co.', total: '$128.90', status: 'Scheduled', time: '1h ago' },
-    ];
-
-    const topProducts = [
-        { name: 'Charred Citrus Bowl', orders: 112, trend: '+14%' },
-        { name: 'Spiced Oat Latte', orders: 96, trend: '+6%' },
-        { name: 'Midnight Baklava', orders: 81, trend: '+21%' },
-    ];
+    const metrics: Array<{ label: string; value: string; delta?: string }> = [];
+    const recentOrders: Array<{ id: string; customer: string; total: string; status: string; time: string }> = [];
+    const topProducts: Array<{ name: string; orders: number; trend?: string }> = [];
 
     const statusBadge = (status: string) => {
         const colors: Record<string, string> = {
@@ -101,13 +69,19 @@ export const WorkspaceHome: React.FC = () => {
                         </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4 w-full lg:w-auto">
-                        {metrics.slice(0, 2).map((metric) => (
-                            <div key={metric.label} className="bg-surface text-text border border-border rounded-2xl px-6 py-4">
-                                <p className="text-sm text-muted mb-1">{metric.label}</p>
-                                <p className="text-2xl font-bold">{metric.value}</p>
-                                <p className="text-xs text-emerald-600 font-medium">{metric.delta}</p>
+                        {metrics.length > 0 ? (
+                            metrics.slice(0, 2).map((metric) => (
+                                <div key={metric.label} className="bg-surface text-text border border-border rounded-2xl px-6 py-4">
+                                    <p className="text-sm text-muted mb-1">{metric.label}</p>
+                                    <p className="text-2xl font-bold">{metric.value}</p>
+                                    {metric.delta && <p className="text-xs text-emerald-600 font-medium">{metric.delta}</p>}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="col-span-2 bg-surface text-text border border-dashed border-border rounded-2xl px-6 py-4">
+                                <p className="text-sm text-muted">No live metrics yet. Connect orders to see performance.</p>
                             </div>
-                        ))}
+                        )}
                     </div>
                 </div>
 
@@ -137,13 +111,20 @@ export const WorkspaceHome: React.FC = () => {
 
                 {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-                    {metrics.map((metric) => (
-                        <div key={metric.label} className="bg-surface border border-border rounded-3xl p-6 shadow-[var(--shadow)]">
-                            <p className="text-sm text-muted mb-2">{metric.label}</p>
-                            <p className="text-3xl font-bold text-text mb-1">{metric.value}</p>
-                            <p className="text-xs font-medium text-emerald-600">{metric.delta}</p>
+                    {metrics.length > 0 ? (
+                        metrics.map((metric) => (
+                            <div key={metric.label} className="bg-surface border border-border rounded-3xl p-6 shadow-[var(--shadow)]">
+                                <p className="text-sm text-muted mb-2">{metric.label}</p>
+                                <p className="text-3xl font-bold text-text mb-1">{metric.value}</p>
+                                {metric.delta && <p className="text-xs font-medium text-emerald-600">{metric.delta}</p>}
+                            </div>
+                        ))
+                    ) : (
+                        <div className="col-span-full bg-surface border border-dashed border-border rounded-3xl p-6 shadow-[var(--shadow)] text-center">
+                            <p className="text-text font-semibold mb-1">Metrics will appear here</p>
+                            <p className="text-muted text-sm">Once Café Griot begins receiving orders, key stats will populate automatically.</p>
                         </div>
-                    ))}
+                    )}
                 </div>
 
                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -161,43 +142,57 @@ export const WorkspaceHome: React.FC = () => {
                                 View all
                             </button>
                         </div>
-                        <div className="divide-y divide-border">
-                            {recentOrders.map((order) => (
-                                <div key={order.id} className="py-4 flex items-center justify-between">
-                                    <div>
-                                        <p className="text-text font-medium">{order.id}</p>
-                                        <p className="text-muted text-sm">{order.customer}</p>
+                        {recentOrders.length > 0 ? (
+                            <div className="divide-y divide-border">
+                                {recentOrders.map((order) => (
+                                    <div key={order.id} className="py-4 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-text font-medium">{order.id}</p>
+                                            <p className="text-muted text-sm">{order.customer}</p>
+                                        </div>
+                                        <div className="hidden md:block text-text font-semibold">{order.total}</div>
+                                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(order.status)}`}>
+                                            {order.status}
+                                        </span>
+                                        <p className="text-muted text-sm w-20 text-right">{order.time}</p>
                                     </div>
-                                    <div className="hidden md:block text-text font-semibold">{order.total}</div>
-                                    <span className={`px-3 py-1 rounded-full text-xs font-semibold ${statusBadge(order.status)}`}>
-                                        {order.status}
-                                    </span>
-                                    <p className="text-muted text-sm w-20 text-right">{order.time}</p>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-10 text-center border border-dashed border-border rounded-2xl">
+                                <p className="text-text font-semibold mb-2">No live pipeline yet</p>
+                                <p className="text-muted text-sm">As soon as orders arrive, they will surface here in real time.</p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Top Products */}
                     <div className="bg-surface border border-border rounded-3xl p-6 shadow-[var(--shadow)]">
                         <p className="text-sm text-muted uppercase tracking-[0.3em] mb-2">Momentum</p>
                         <h2 className="text-2xl font-semibold text-text mb-4">Top products</h2>
-                        <div className="space-y-4">
-                            {topProducts.map((product, index) => (
-                                <div key={product.name} className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <span className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-sm font-semibold text-text">
-                                            {index + 1}
-                                        </span>
-                                        <div>
-                                            <p className="text-text font-medium">{product.name}</p>
-                                            <p className="text-muted text-sm">{product.orders} orders</p>
+                        {topProducts.length > 0 ? (
+                            <div className="space-y-4">
+                                {topProducts.map((product, index) => (
+                                    <div key={product.name} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <span className="w-8 h-8 rounded-full bg-surface-2 border border-border flex items-center justify-center text-sm font-semibold text-text">
+                                                {index + 1}
+                                            </span>
+                                            <div>
+                                                <p className="text-text font-medium">{product.name}</p>
+                                                <p className="text-muted text-sm">{product.orders} orders</p>
+                                            </div>
                                         </div>
+                                        {product.trend && <p className="text-emerald-600 text-sm font-semibold">{product.trend}</p>}
                                     </div>
-                                    <p className="text-emerald-600 text-sm font-semibold">{product.trend}</p>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="py-10 text-center border border-dashed border-border rounded-2xl">
+                                <p className="text-text font-semibold mb-2">No sales yet</p>
+                                <p className="text-muted text-sm">Once menu items start selling, your top performers will be highlighted here.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

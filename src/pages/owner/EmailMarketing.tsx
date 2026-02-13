@@ -8,7 +8,12 @@ export const EmailMarketing: React.FC = () => {
     const [formData, setFormData] = useState({
         name: '',
         subject: '',
+        preheader: '',
+        headline: '',
+        description: '',
         message: '',
+        cta_text: '',
+        cta_url: '',
         min_orders: 0,
         test_email: '',
     });
@@ -66,8 +71,97 @@ export const EmailMarketing: React.FC = () => {
         return `${origin}/order/${slug}`;
     }, [activeWorkspace?.slug]);
 
+    const normalizedCtaUrl = useMemo(() => {
+        const url = (formData.cta_url || '').trim();
+        if (!url) return '';
+        if (url.startsWith('http://') || url.startsWith('https://')) return url;
+        return `https://${url}`;
+    }, [formData.cta_url]);
+
+    const applyTemplate = (template: 'promo' | 'new' | 'restock' | 'valentines') => {
+        if (template === 'promo') {
+            setFormData((prev) => ({
+                ...prev,
+                subject: prev.subject || 'A special offer for you',
+                preheader: prev.preheader || 'Limited-time deal inside',
+                headline: prev.headline || 'Limited-time offer',
+                description: prev.description || 'Don’t miss our limited-time special.',
+                message:
+                    prev.message ||
+                    'Hey there!\n\nWe’re running a limited-time offer this week. Tap below to order your favorites.\n\nSee you soon!',
+                cta_text: prev.cta_text || 'Order now',
+                cta_url: prev.cta_url || storefrontBaseUrl,
+            }));
+            return;
+        }
+        if (template === 'new') {
+            setFormData((prev) => ({
+                ...prev,
+                subject: prev.subject || 'New items just dropped',
+                preheader: prev.preheader || 'Fresh picks waiting for you',
+                headline: prev.headline || 'New on the menu',
+                description: prev.description || 'Fresh, delicious, and ready to order.',
+                message:
+                    prev.message ||
+                    'Good news!\n\nWe just added new items to the menu. Check them out and place your order in seconds.',
+                cta_text: prev.cta_text || 'View menu',
+                cta_url: prev.cta_url || storefrontBaseUrl,
+            }));
+            return;
+        }
+        if (template === 'valentines') {
+            setFormData((prev) => ({
+                ...prev,
+                subject: prev.subject || "Valentine’s special 💝", 
+                preheader: prev.preheader || 'Limited-time Valentine’s picks inside',
+                headline: prev.headline || 'Valentine’s special',
+                description: prev.description || 'Treat someone (or yourself) to something delicious.',
+                message:
+                    prev.message ||
+                    'Happy Valentine’s Day!\n\nWe curated a few favorites perfect for the occasion. Choose your items below and place your order in minutes.',
+                cta_text: prev.cta_text || 'Order for Valentine’s',
+                cta_url: prev.cta_url || storefrontBaseUrl,
+            }));
+            return;
+        }
+        setFormData((prev) => ({
+            ...prev,
+            subject: prev.subject || 'Back in stock',
+            preheader: prev.preheader || 'Your favorites are available again',
+            headline: prev.headline || 'Back in stock',
+            description: prev.description || 'Your favorites are ready when you are.',
+            message:
+                prev.message ||
+                'Just a quick note—your favorites are back and ready to order.\n\nTap below to grab them before they’re gone again!',
+            cta_text: prev.cta_text || 'Order now',
+            cta_url: prev.cta_url || storefrontBaseUrl,
+        }));
+    };
+
     const buildEmailHtml = () => {
         const bodyHtml = formatMessageToHtml(formData.message);
+        const preheaderText = (formData.preheader || '').trim();
+        const preheaderHtml = preheaderText
+            ? `
+                <div style="display:none;font-size:1px;color:#ffffff;line-height:1px;max-height:0px;max-width:0px;opacity:0;overflow:hidden;">
+                    ${escapeHtml(preheaderText)}
+                </div>
+            `
+            : '';
+        const headlineHtml = (formData.headline || '').trim()
+            ? `<h1 style="margin: 0 0 12px; font-size: 24px; line-height: 1.2; font-weight: 800;">${escapeHtml(formData.headline.trim())}</h1>`
+            : '';
+        const descriptionText = (formData.description || '').trim();
+        const descriptionHtml = descriptionText
+            ? `<p style="margin: 0 0 14px; font-size: 16px; line-height: 1.6; color: #374151;">${escapeHtml(descriptionText)}</p>`
+            : '';
+
+        const ctaText = (formData.cta_text || '').trim();
+        const ctaUrl = normalizedCtaUrl || '';
+        const ctaHtml = ctaText && ctaUrl
+            ? `<div style="margin-top: 16px; margin-bottom: 8px;"><a href="${escapeHtml(ctaUrl)}" style="display: inline-block; background: #111827; color: #ffffff; text-decoration: none; padding: 12px 16px; border-radius: 12px; font-weight: 700;">${escapeHtml(ctaText)}</a></div>`
+            : '';
+
         const productsHtml = selectedProducts.length
             ? `
                 <div style="margin-top: 20px;">
@@ -101,12 +195,18 @@ export const EmailMarketing: React.FC = () => {
 
         const brand = escapeHtml(activeWorkspace?.name || '');
         return `
-            <div style="background: #ffffff; padding: 20px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color: #111827;">
+            <div style="background: #f9fafb; padding: 16px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; color: #111827;">
                 <div style="max-width: 640px; margin: 0 auto;">
-                    ${brand ? `<div style="font-size: 13px; color: #6b7280; margin-bottom: 10px;">${brand}</div>` : ''}
-                    ${bodyHtml}
-                    ${productsHtml}
-                    ${storefrontBaseUrl ? `<div style="margin-top: 18px;"><a href="${storefrontBaseUrl}" style="color: #2563eb; text-decoration: none;">View full menu</a></div>` : ''}
+                    ${preheaderHtml}
+                    <div style="background: #ffffff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px;">
+                        ${brand ? `<div style="font-size: 13px; color: #6b7280; margin-bottom: 10px;">${brand}</div>` : ''}
+                        ${headlineHtml}
+                        ${descriptionHtml}
+                        ${bodyHtml}
+                        ${ctaHtml}
+                        ${productsHtml}
+                        ${storefrontBaseUrl ? `<div style="margin-top: 18px;"><a href="${storefrontBaseUrl}" style="color: #2563eb; text-decoration: none;">View full menu</a></div>` : ''}
+                    </div>
                 </div>
             </div>
         `.trim();
@@ -162,7 +262,12 @@ export const EmailMarketing: React.FC = () => {
             setFormData({
                 name: '',
                 subject: '',
+                preheader: '',
+                headline: '',
+                description: '',
                 message: '',
+                cta_text: '',
+                cta_url: '',
                 min_orders: 0,
                 test_email: '',
             });
@@ -189,6 +294,47 @@ export const EmailMarketing: React.FC = () => {
                     <h2 className="text-xl font-bold text-text mb-6">Create Campaign</h2>
 
                     <div className="space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 bg-surface-2 border border-border rounded-[var(--radius)] p-4">
+                            <div>
+                                <div className="text-text font-semibold">Start from a template</div>
+                                <div className="text-muted text-xs">Pre-fill a campaign layout, then customize it</div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('promo')}
+                                    disabled={sending}
+                                    className="px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius)] hover:bg-surface-2 disabled:opacity-50"
+                                >
+                                    Promo
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('new')}
+                                    disabled={sending}
+                                    className="px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius)] hover:bg-surface-2 disabled:opacity-50"
+                                >
+                                    New items
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('restock')}
+                                    disabled={sending}
+                                    className="px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius)] hover:bg-surface-2 disabled:opacity-50"
+                                >
+                                    Back in stock
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => applyTemplate('valentines')}
+                                    disabled={sending}
+                                    className="px-3 py-2 text-sm bg-surface border border-border rounded-[var(--radius)] hover:bg-surface-2 disabled:opacity-50"
+                                >
+                                    Valentine’s
+                                </button>
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-muted text-sm font-medium mb-2">
                                 Campaign Name *
@@ -201,6 +347,51 @@ export const EmailMarketing: React.FC = () => {
                                 className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
                                 disabled={sending}
                             />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-muted text-sm font-medium mb-2">
+                                    Preheader
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.preheader}
+                                    onChange={(e) => setFormData({ ...formData, preheader: e.target.value })}
+                                    placeholder="Short summary shown in inbox preview"
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                    disabled={sending}
+                                />
+                                <p className="text-muted text-xs mt-1">Optional, but increases open rates.</p>
+                            </div>
+                            <div>
+                                <label className="block text-muted text-sm font-medium mb-2">
+                                    Headline
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.headline}
+                                    onChange={(e) => setFormData({ ...formData, headline: e.target.value })}
+                                    placeholder="Big title inside the email"
+                                    className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                    disabled={sending}
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-muted text-sm font-medium mb-2">
+                                Short description
+                            </label>
+                            <input
+                                type="text"
+                                value={formData.description}
+                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                placeholder="A short line that explains the offer"
+                                className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                disabled={sending}
+                            />
+                            <p className="text-muted text-xs mt-1">This appears under the title in the email.</p>
                         </div>
 
                         <div>
@@ -232,6 +423,35 @@ export const EmailMarketing: React.FC = () => {
                             <p className="text-muted text-xs mt-2">
                                 Use new lines to separate paragraphs. Products you select below will be added automatically with “Order now” links.
                             </p>
+                        </div>
+
+                        <div className="bg-surface-2 border border-border rounded-[var(--radius)] p-4">
+                            <div className="text-text font-semibold">Call to action button</div>
+                            <div className="text-muted text-xs mb-3">Optional button to drive clicks (menu, promo page, etc.)</div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-muted text-sm font-medium mb-2">Button text</label>
+                                    <input
+                                        type="text"
+                                        value={formData.cta_text}
+                                        onChange={(e) => setFormData({ ...formData, cta_text: e.target.value })}
+                                        placeholder="Order now"
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                        disabled={sending}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-muted text-sm font-medium mb-2">Button link</label>
+                                    <input
+                                        type="text"
+                                        value={formData.cta_url}
+                                        onChange={(e) => setFormData({ ...formData, cta_url: e.target.value })}
+                                        placeholder={storefrontBaseUrl || 'https://yourstore.com/order'}
+                                        className="w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius)] text-text placeholder:text-muted focus:outline-none focus:border-primary"
+                                        disabled={sending}
+                                    />
+                                </div>
+                            </div>
                         </div>
 
                         <div className="bg-surface-2 border border-border rounded-[var(--radius)] p-4">
