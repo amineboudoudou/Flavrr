@@ -157,17 +157,18 @@ export const EmailMarketing: React.FC = () => {
             : '';
 
         const ctaText = (formData.cta_text || '').trim();
-        const ctaUrl = normalizedCtaUrl || '';
+        const ctaUrl = normalizedCtaUrl || storefrontBaseUrl || '';
         const ctaHtml = ctaText && ctaUrl
             ? `<div style="margin-top: 16px; margin-bottom: 8px;"><a href="${escapeHtml(ctaUrl)}" style="display: inline-block; background: #111827; color: #ffffff; text-decoration: none; padding: 12px 16px; border-radius: 12px; font-weight: 700;">${escapeHtml(ctaText)}</a></div>`
             : '';
 
-        const productsHtml = selectedProducts.length
+        const productsForEmail = selectedProducts.slice(0, 6);
+        const productsHtml = productsForEmail.length
             ? `
                 <div style="margin-top: 20px;">
                     <h2 style="font-size: 16px; margin: 0 0 12px;">Featured items</h2>
                     <div>
-                        ${selectedProducts
+                        ${productsForEmail
                             .map((p: any) => {
                                 const href = storefrontBaseUrl ? `${storefrontBaseUrl}?item=${encodeURIComponent(p.id)}` : '';
                                 const title = escapeHtml(p.name_en || p.name_fr || 'Item');
@@ -189,6 +190,7 @@ export const EmailMarketing: React.FC = () => {
                             })
                             .join('')}
                     </div>
+                    ${selectedProducts.length > productsForEmail.length ? `<p style="color: #6b7280; margin-top: 12px;">Showing ${productsForEmail.length} of ${selectedProducts.length} featured items. Consider featuring fewer items for better performance.</p>` : ''}
                 </div>
             `
             : '';
@@ -511,6 +513,12 @@ export const EmailMarketing: React.FC = () => {
                                     <div className="px-3 py-3 text-sm text-muted">No products found.</div>
                                 )}
                             </div>
+
+                            {selectedProductIds.length > 3 && (
+                                <div className="mt-3 text-xs text-muted">
+                                    For best conversions on mobile, featuring 1–3 products usually performs better.
+                                </div>
+                            )}
 
                             {!activeWorkspace?.slug && (
                                 <div className="mt-3 text-xs text-muted">
