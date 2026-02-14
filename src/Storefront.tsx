@@ -86,9 +86,10 @@ const Storefront: React.FC = () => {
 
             try {
                 if (isMounted) setLoading(true);
-                const orgSlug = slug || 'cafe-du-griot';
-                payload = await api.publicGetMenu(orgSlug);
-                console.log(`✅ Loaded ${payload.menu.length} categories.`);
+                // Use workspace slug from URL, default to 'flavrr' for backward compatibility
+                const workspaceSlug = slug || 'flavrr';
+                payload = await api.publicGetMenu(workspaceSlug);
+                console.log(`✅ Loaded ${payload.menu.length} categories for workspace: ${workspaceSlug}`);
             } catch (error: any) {
                 if (error?.message === 'TIMEOUT') {
                     console.warn('⚠️ Menu fetch timed out. Using fallback menu.');
@@ -490,6 +491,7 @@ const Storefront: React.FC = () => {
                 items={cart}
                 cartTotal={cartTotal}
                 organization={organization}
+                workspaceSlug={slug || 'flavrr'}
                 onSuccess={() => setCart([])}
                 initialStep={checkoutInitialStep}
                 initialToken={checkoutInitialToken}

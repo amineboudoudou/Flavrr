@@ -14,11 +14,12 @@ serve(async (req) => {
 
     try {
         const url = new URL(req.url)
-        const orgSlug = url.searchParams.get('org_slug')
+        // Support workspace_slug (primary) with backward compatibility for org_slug
+        const workspaceSlug = url.searchParams.get('workspace_slug') || url.searchParams.get('org_slug')
 
-        if (!orgSlug) {
+        if (!workspaceSlug) {
             return new Response(
-                JSON.stringify({ error: 'org_slug parameter required' }),
+                JSON.stringify({ error: 'workspace_slug parameter required' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
@@ -29,7 +30,33 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
-        // Fetch organization
+        // Fetch workspace and organization (multi-tenant)
+        const { data: workspace, error: workspaceError } = await supabaseAdmin
+            .from('workspaces')
+            .select(`
+                id,
+                name,
+                slug,
+                org_id
+            `)
+            .eq('slug', workspaceSlug)
+            .single()
+
+        if (workspaceError || !workspace) {
+            return new Response(
+                JSON.stringify({ error: 'Workspace not found' }),
+                { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        if (!workspace.org_id) {
+            return new Response(
+                JSON.stringify({ error: 'Workspace configuration error' }),
+                { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+        }
+
+        // Fetch organization details
         const { data: org, error: orgError } = await supabaseAdmin
             .from('organizations')
             .select(`
@@ -45,7 +72,7 @@ serve(async (req) => {
                 address_text,
                 settings
             `)
-            .eq('slug', orgSlug)
+            .eq('id', workspace.org_id)
             .single()
 
         if (orgError || !org) {
@@ -113,8 +140,13 @@ serve(async (req) => {
             throw hoursError
         }
 
-        // Structure response
+        // Structure response with workspace info
         const response = {
+            workspace: {
+                id: workspace.id,
+                name: workspace.name,
+                slug: workspace.slug
+            },
             organization: {
                 id: org.id,
                 name: org.name,

@@ -365,12 +365,13 @@ export async function publicCreateOrder(data: {
     return response.json();
 }
 
-export async function publicGetMenu(orgSlug: string): Promise<{
+export async function publicGetMenu(workspaceSlug: string): Promise<{
+    workspace?: { id: string; name: string; slug: string };
     organization: OrganizationProfile;
     menu: any[];
 }> {
     const url = new URL(`${EDGE_FUNCTION_URL}/public_get_menu`);
-    url.searchParams.append('org_slug', orgSlug);
+    url.searchParams.append('workspace_slug', workspaceSlug);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
@@ -658,7 +659,7 @@ export async function publicCreatePaymentIntent(data: any) {
     // Ensure workspace slug fallback to avoid "Workspace not found" when org not yet loaded
     const payload = {
         ...data,
-        workspace_slug: data?.workspace_slug || 'flavrr',
+        workspace_slug: data?.workspace_slug,
     };
     // Add cache-busting for iOS Safari
     const url = new URL(`${EDGE_FUNCTION_URL}/create-payment-intent`);

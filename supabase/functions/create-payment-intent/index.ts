@@ -139,8 +139,13 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Force workspace slug to flavrr to avoid invalid slugs from client
-    body.workspace_slug = 'flavrr';
+    // Accept workspace_slug from client - multi-tenant support
+    if (!body.workspace_slug) {
+      return new Response(JSON.stringify({ error: 'Missing workspace_slug', requestId }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     console.log('create-payment-intent request body', JSON.stringify({
       workspace_slug: body.workspace_slug,
@@ -159,27 +164,27 @@ serve(async (req) => {
 
     let workspaceSlug = body.workspace_slug;
 
-    // Get workspace with fallback retry to 'flavrr'
-    const fetchWorkspace = async (slug: string) => {
-      return supabase
-        .from('workspaces')
-        .select('id, name, slug')
-        .eq('slug', slug)
-        .single();
-    };
-
-    let { data: workspace, error: workspaceError } = await fetchWorkspace(workspaceSlug);
+    // Get workspace with org_id for multi-tenant support
+    const { data: workspace, error: workspaceError } = await supabase
+      .from('workspaces')
+      .select('id, name, slug, org_id')
+      .eq('slug', workspaceSlug)
+      .single();
 
     if (workspaceError || !workspace) {
-      console.warn('Workspace not found for slug, retrying with flavrr', workspaceSlug);
-      workspaceSlug = 'flavrr';
-      const retry = await fetchWorkspace(workspaceSlug);
-      workspace = retry.data;
-      workspaceError = retry.error;
+      console.error('Workspace not found for slug', workspaceSlug, workspaceError);
+      return new Response(JSON.stringify({ error: 'Workspace not found', requestId }), {
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    if (workspaceError || !workspace) {
-      return new Response(JSON.stringify({ error: 'Workspace not found', requestId }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (!workspace.org_id) {
+      console.error('Workspace missing org_id', workspace);
+      return new Response(JSON.stringify({ error: 'Workspace configuration error', requestId }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     let orderId: string;
@@ -234,7 +239,7 @@ serve(async (req) => {
           .insert({
             workspace_id: workspace.id,
             status: 'draft',
-            org_id: '00000000-0000-0000-0000-000000000001',
+            org_id: workspace.org_id,
             fulfillment_type: body.fulfillment.type,
             subtotal_cents: body.totals.subtotal_cents,
             delivery_fee_cents: body.totals.delivery_fee_cents,

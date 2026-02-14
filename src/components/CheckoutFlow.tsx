@@ -18,6 +18,7 @@ interface Props {
     items: CartItem[];
     cartTotal: number;
     organization: OrganizationProfile | null;
+    workspaceSlug: string;
     onSuccess: () => void;
     initialStep?: CheckoutStep;
     initialToken?: string;
@@ -106,7 +107,7 @@ const PaymentForm = ({
     );
 };
 
-export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, cartTotal, organization, onSuccess, initialStep = 'ITEMS', initialToken = '' }) => {
+export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, cartTotal, organization, workspaceSlug, onSuccess, initialStep = 'ITEMS', initialToken = '' }) => {
     const [step, setStep] = useState<CheckoutStep>(initialStep);
     const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('pickup');
     const [selectedSlot, setSelectedSlot] = useState<string>('');
@@ -246,7 +247,7 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                     }
                     
                     const res = await api.publicCreatePaymentIntent({
-                        workspace_slug: organization?.slug || 'flavrr',
+                        workspace_slug: workspaceSlug,
                         idempotency_key: idempotencyKey,
                         currency: 'cad',
                         items: items.map(i => ({
