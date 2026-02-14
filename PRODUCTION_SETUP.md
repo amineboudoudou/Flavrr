@@ -4,6 +4,7 @@
 
 ### Supabase Edge Functions
 All critical functions have been deployed to project `lcgckjfhlvuxnnjylzvk`:
+
 **Storefront (Public)**
 - ✅ `public_get_menu` - Fetches menu categories and items for storefront
 - ✅ `create-payment-intent` - Creates Stripe payment intents with Connect
