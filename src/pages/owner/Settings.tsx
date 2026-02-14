@@ -351,9 +351,9 @@ export const Settings: React.FC = () => {
                             </div>
 
                             {/* Address */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                                 <div className="flex items-center justify-between mb-4">
-                                    <h2 className="text-white text-lg font-semibold">Restaurant Address</h2>
+                                    <h2 className="text-slate-900 text-lg font-semibold tracking-tight">Restaurant Address</h2>
                                     {addressVerified && (
                                         <span className="flex items-center gap-2 text-green-400 text-sm font-medium bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20">
                                             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -366,7 +366,7 @@ export const Settings: React.FC = () => {
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-white/70 text-sm mb-2">
+                                        <label className="block text-slate-700 text-sm mb-2 font-medium">
                                             Search Address (Google Places)
                                         </label>
                                         <AddressAutocomplete
@@ -375,7 +375,7 @@ export const Settings: React.FC = () => {
                                             onValueChange={handleAddressInputChange}
                                             placeholder="Start typing your restaurant address..."
                                             restrictCountries={['ca', 'us']}
-                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white placeholder:text-white/40 focus:border-pink-500 focus:outline-none transition-colors"
+                                            className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 placeholder:text-slate-400 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none transition-colors"
                                         />
                                         {addressError && (
                                             <p className="text-red-400 text-xs mt-1">{addressError}</p>
@@ -386,28 +386,28 @@ export const Settings: React.FC = () => {
                                     </div>
 
                                     {addressVerified && settings.address_json && (
-                                        <div className="bg-neutral-900/50 border border-white/5 rounded-lg p-4 space-y-2">
-                                            <p className="text-white/40 text-xs uppercase tracking-wider font-semibold">Verified Details</p>
+                                        <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2">
+                                            <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold">Verified Details</p>
                                             <div className="grid grid-cols-2 gap-3 text-sm">
                                                 <div>
-                                                    <span className="text-white/50">Street:</span>
-                                                    <span className="text-white ml-2">{settings.address_json.street1}</span>
+                                                    <span className="text-slate-500">Street:</span>
+                                                    <span className="text-slate-900 ml-2">{settings.address_json.street1}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-white/50">City:</span>
-                                                    <span className="text-white ml-2">{settings.address_json.city}</span>
+                                                    <span className="text-slate-500">City:</span>
+                                                    <span className="text-slate-900 ml-2">{settings.address_json.city}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-white/50">Province:</span>
-                                                    <span className="text-white ml-2">{settings.address_json.province}</span>
+                                                    <span className="text-slate-500">Province:</span>
+                                                    <span className="text-slate-900 ml-2">{settings.address_json.province}</span>
                                                 </div>
                                                 <div>
-                                                    <span className="text-white/50">Postal:</span>
-                                                    <span className="text-white ml-2">{settings.address_json.postal_code}</span>
+                                                    <span className="text-slate-500">Postal:</span>
+                                                    <span className="text-slate-900 ml-2">{settings.address_json.postal_code}</span>
                                                 </div>
                                                 <div className="col-span-2">
-                                                    <span className="text-white/50">Coordinates:</span>
-                                                    <span className="text-white ml-2 font-mono text-xs">
+                                                    <span className="text-slate-500">Coordinates:</span>
+                                                    <span className="text-slate-900 ml-2 font-mono text-xs">
                                                         {settings.address_json.lat.toFixed(6)}, {settings.address_json.lng.toFixed(6)}
                                                     </span>
                                                 </div>
@@ -418,12 +418,12 @@ export const Settings: React.FC = () => {
                             </div>
 
                             {/* Fulfillment Options */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                                <h2 className="text-white text-lg font-semibold mb-4">Fulfillment Options</h2>
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h2 className="text-slate-900 text-lg font-semibold tracking-tight mb-4">Fulfillment Options</h2>
 
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-white/70 text-sm mb-3">Available Services</label>
+                                        <label className="block text-slate-700 text-sm mb-3 font-medium">Available Services</label>
                                         <div className="flex gap-4">
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input
@@ -432,7 +432,7 @@ export const Settings: React.FC = () => {
                                                     onChange={() => toggleFulfillmentType('delivery')}
                                                     className="w-4 h-4"
                                                 />
-                                                <span className="text-white">🚚 Delivery</span>
+                                                <span className="text-slate-900">🚚 Delivery</span>
                                             </label>
                                             <label className="flex items-center gap-2 cursor-pointer">
                                                 <input
@@ -441,31 +441,31 @@ export const Settings: React.FC = () => {
                                                     onChange={() => toggleFulfillmentType('pickup')}
                                                     className="w-4 h-4"
                                                 />
-                                                <span className="text-white">🏃 Pickup</span>
+                                                <span className="text-slate-900">🏃 Pickup</span>
                                             </label>
                                         </div>
                                     </div>
 
                                     {fulfillmentTypes.includes('delivery') && (
                                         <div>
-                                            <label className="block text-white/70 text-sm mb-2">Delivery Opening Time</label>
+                                            <label className="block text-slate-700 text-sm mb-2 font-medium">Delivery Opening Time</label>
                                             <input
                                                 type="time"
                                                 value={settings.settings.delivery_opening_time || '09:00'}
                                                 onChange={(e) => updateSettingsField('delivery_opening_time', e.target.value)}
-                                                className="bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                                className="bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none"
                                             />
-                                            <p className="text-white/40 text-xs mt-1">When delivery service starts</p>
+                                            <p className="text-slate-500 text-xs mt-1">When delivery service starts</p>
                                         </div>
                                     )}
 
                                     <div>
-                                        <label className="block text-white/70 text-sm mb-2">Preparation Time (minutes)</label>
+                                        <label className="block text-slate-700 text-sm mb-2 font-medium">Preparation Time (minutes)</label>
                                         <input
                                             type="number"
                                             value={settings.settings.default_prep_time_minutes || 30}
                                             onChange={(e) => updateSettingsField('default_prep_time_minutes', parseInt(e.target.value))}
-                                            className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white"
+                                            className="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none"
                                             placeholder="30"
                                         />
                                     </div>
@@ -473,9 +473,9 @@ export const Settings: React.FC = () => {
                             </div>
 
                             {/* Business Hours */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                                <h2 className="text-white text-lg font-semibold mb-2">Business Hours</h2>
-                                <p className="text-white/60 text-sm mb-6">
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h2 className="text-slate-900 text-lg font-semibold tracking-tight mb-2">Business Hours</h2>
+                                <p className="text-slate-600 text-sm mb-6">
                                     Define when your restaurant is open and accepting orders.
                                 </p>
 
@@ -489,9 +489,9 @@ export const Settings: React.FC = () => {
                                         };
 
                                         return (
-                                            <div key={day} className="flex flex-col md:flex-row md:items-center justify-between py-3 border-b border-white/5 last:border-0 gap-4">
+                                            <div key={day} className="flex flex-col md:flex-row md:items-center justify-between py-3 border-b border-slate-200 last:border-0 gap-4">
                                                 <div className="w-32">
-                                                    <span className="text-white font-medium">{day}</span>
+                                                    <span className="text-slate-900 font-medium">{day}</span>
                                                 </div>
 
                                                 <div className="flex flex-1 items-center gap-4">
@@ -500,9 +500,9 @@ export const Settings: React.FC = () => {
                                                             type="checkbox"
                                                             checked={!hour.is_closed}
                                                             onChange={(e) => updateBusinessHour(index, 'is_closed', !e.target.checked)}
-                                                            className="w-4 h-4 rounded border-white/10"
+                                                            className="w-4 h-4 rounded border-slate-300"
                                                         />
-                                                        <span className="text-white/70 text-sm">{hour.is_closed ? 'Closed' : 'Open'}</span>
+                                                        <span className="text-slate-600 text-sm">{hour.is_closed ? 'Closed' : 'Open'}</span>
                                                     </label>
 
                                                     {!hour.is_closed && (
@@ -511,14 +511,14 @@ export const Settings: React.FC = () => {
                                                                 type="time"
                                                                 value={hour.open_time.substring(0, 5)}
                                                                 onChange={(e) => updateBusinessHour(index, 'open_time', e.target.value)}
-                                                                className="bg-neutral-900 border border-white/10 rounded-lg px-3 py-1 text-white text-sm"
+                                                                className="bg-white border border-slate-300 rounded-lg px-3 py-1 text-slate-900 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none"
                                                             />
-                                                            <span className="text-white/30">to</span>
+                                                            <span className="text-slate-400">to</span>
                                                             <input
                                                                 type="time"
                                                                 value={hour.close_time.substring(0, 5)}
                                                                 onChange={(e) => updateBusinessHour(index, 'close_time', e.target.value)}
-                                                                className="bg-neutral-900 border border-white/10 rounded-lg px-3 py-1 text-white text-sm"
+                                                                className="bg-white border border-slate-300 rounded-lg px-3 py-1 text-slate-900 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 focus:outline-none"
                                                             />
                                                         </div>
                                                     )}
@@ -589,8 +589,8 @@ export const Settings: React.FC = () => {
                                                 </svg>
                                             </div>
                                             <div className="flex-1">
-                                                <h3 className="text-white font-medium mb-1">Want to customize your link?</h3>
-                                                <p className="text-white/60 text-sm mb-3">
+                                                <h3 className="text-slate-900 font-medium mb-1">Want to customize your link?</h3>
+                                                <p className="text-slate-600 text-sm mb-3">
                                                     Your link slug is currently <span className="text-primary font-mono">{settings.slug}</span>. Contact support if you'd like to change it to match your brand better.
                                                 </p>
                                             </div>
