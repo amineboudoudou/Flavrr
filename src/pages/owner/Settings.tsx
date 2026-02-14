@@ -4,6 +4,7 @@ import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
 import { AddressAutocomplete, type AddressComponents } from '../../components/AddressAutocomplete';
 import type { VerifiedAddress } from '../../types';
+import { PaymentOnboarding } from './PaymentOnboarding';
 
 interface BusinessHour {
     day_of_week: number;
@@ -661,73 +662,13 @@ export const Settings: React.FC = () => {
 
                     {/* Banking Tab */}
                     {activeTab === 'banking' && (
-                        <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                            <h2 className="text-white text-lg font-semibold mb-2">Payouts & Stripe Connect</h2>
-                            <p className="text-white/60 text-sm mb-6">
-                                Connect your bank account via Stripe to receive payouts automatically.
-                            </p>
-
-                            <div className="space-y-6">
-                                {/* Connect Status Card */}
-                                <div className={`border rounded-lg p-5 ${settings.stripe_account_status === 'complete' || settings.stripe_account_status === 'details_submitted'
-                                    ? 'bg-green-500/10 border-green-500/30'
-                                    : 'bg-neutral-900 border-white/10'
-                                    }`}>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h3 className="text-white font-medium mb-1">
-                                                {settings.stripe_account_status === 'complete'
-                                                    ? '✅ Payouts Active'
-                                                    : (settings.stripe_account_status === 'details_submitted'
-                                                        ? '⏳ Verification Pending'
-                                                        : '⚠️ Setup Required')}
-                                            </h3>
-                                            <p className="text-white/60 text-sm">
-                                                {settings.stripe_account_status === 'complete'
-                                                    ? 'Your account is ready to receive payouts.'
-                                                    : 'Complete the onboarding to start receiving funds.'}
-                                            </p>
-                                        </div>
-
-                                        {(!settings.stripe_account_status || settings.stripe_account_status === 'pending' || settings.stripe_account_status === 'restricted') && (
-                                            <button
-                                                onClick={async () => {
-                                                    try {
-                                                        const res = await api.connectOnboarding();
-                                                        if (res.url) window.location.href = res.url;
-                                                    } catch (err) {
-                                                        alert('Failed to start onboarding');
-                                                    }
-                                                }}
-                                                className="bg-[#635BFF] hover:bg-[#5851E0] text-white px-4 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2"
-                                            >
-                                                <span>Connect with Stripe</span>
-                                                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Manual Banking Info (Fallback/Legacy) */}
-                                {(!settings.stripe_account_id) && (
-                                    <div className="opacity-50 pointer-events-none filter blur-[1px]">
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <div className="h-px bg-white/10 flex-1"></div>
-                                            <span className="text-white/40 text-xs uppercase tracking-wider">Legacy Settings</span>
-                                            <div className="h-px bg-white/10 flex-1"></div>
-                                        </div>
-                                        <div className="space-y-4 max-w-2xl">
-                                            <div>
-                                                <label className="block text-white/70 text-sm mb-2">Account Holder Name</label>
-                                                <input disabled type="text" className="w-full bg-neutral-900 border border-white/10 rounded-lg px-4 py-2 text-white/50" value="Managed by Stripe" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
+                        <PaymentOnboarding 
+                            stripeAccountStatus={settings.stripe_account_status}
+                            onConnect={async () => {
+                                const res = await api.connectOnboarding();
+                                if (res.url) window.location.href = res.url;
+                            }}
+                        />
                     )}
 
                     {/* Save Button */}
