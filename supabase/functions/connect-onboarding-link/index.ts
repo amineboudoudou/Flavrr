@@ -9,62 +9,136 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+// CORS helper: Allow production + Vercel preview domains
+const ALLOWED_ORIGINS = [
+  'https://flavrr-snowy.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  let allowedOrigin = 'https://flavrr-snowy.vercel.app';
+  
+  if (origin) {
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      allowedOrigin = origin;
+    }
+    else if (origin.endsWith('.vercel.app')) {
+      allowedOrigin = origin;
+    }
+  }
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user is authenticated
+    // Verify JWT using Supabase client with ANON key
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      console.error('Auth verification failed:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+        status: 401, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
-    const { workspace_id, refresh_url, return_url } = await req.json();
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    if (!workspace_id) {
-      return new Response(JSON.stringify({ error: 'workspace_id is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Parse optional body
+    let bodyData: any = {};
+    try {
+      const text = await req.text();
+      if (text) bodyData = JSON.parse(text);
+    } catch (e) {
+      // Empty body is fine
     }
 
-    // Verify user is owner of workspace
-    const { data: membership, error: membershipError } = await supabase
-      .from('workspace_memberships')
-      .select('role')
-      .eq('workspace_id', workspace_id)
+    const { refresh_url, return_url } = bodyData;
+
+    // Derive workspace from authenticated user
+    console.log('Fetching profile for user:', user.id);
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('org_id, role')
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError || !membership || membership.role !== 'owner') {
-      return new Response(JSON.stringify({ error: 'Only workspace owners can access onboarding' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (profileError || !profile) {
+      console.error('Profile not found:', profileError);
+      return new Response(JSON.stringify({ error: 'User profile not found' }), { 
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    // Get workspace slug for URLs
-    const { data: workspace } = await supabase
+    if (!['owner', 'admin'].includes(profile.role)) {
+      return new Response(JSON.stringify({ error: 'Only owners and admins can access onboarding' }), { 
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (!profile.org_id) {
+      return new Response(JSON.stringify({ error: 'User profile missing organization' }), { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Find workspace for this organization
+    console.log('Finding workspace for org:', profile.org_id);
+    const { data: workspaces, error: workspaceError } = await supabase
       .from('workspaces')
-      .select('slug')
-      .eq('id', workspace_id)
-      .single();
+      .select('id, slug, name')
+      .eq('org_id', profile.org_id)
+      .order('created_at', { ascending: false });
+
+    if (workspaceError || !workspaces || workspaces.length === 0) {
+      console.error('No workspace found for org:', profile.org_id, workspaceError);
+      return new Response(JSON.stringify({ error: 'No workspace found for your organization' }), { 
+        status: 404,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const workspace = workspaces[0];
+    if (workspaces.length > 1) {
+      console.warn(`Multiple workspaces found for org ${profile.org_id}, using most recent:`, workspace.id);
+    }
+
+    const workspace_id = workspace.id;
+    console.log('Using workspace:', workspace_id, workspace.slug);
 
     const baseUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
-    const defaultRefreshUrl = refresh_url || `${baseUrl}/app/${workspace?.slug}/settings/payouts`;
-    const defaultReturnUrl = return_url || `${baseUrl}/app/${workspace?.slug}/settings/payouts?onboarding=complete`;
+    const defaultRefreshUrl = refresh_url || `${baseUrl}/app/${workspace.slug}/settings/payouts`;
+    const defaultReturnUrl = return_url || `${baseUrl}/app/${workspace.slug}/settings/payouts?onboarding=complete`;
 
     // Get payout account
     const { data: payoutAccount, error: accountError } = await supabase
@@ -74,7 +148,10 @@ serve(async (req) => {
       .single();
 
     if (accountError || !payoutAccount) {
-      return new Response(JSON.stringify({ error: 'Payout account not found. Create account first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Payout account not found. Create account first.' }), { 
+        status: 404, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     // Create account link
@@ -110,9 +187,11 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in connect-onboarding-link:', error);
+    const origin = req.headers.get('origin');
+    const errorCorsHeaders = getCorsHeaders(origin);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...errorCorsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
