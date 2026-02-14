@@ -1,0 +1,7 @@
+# Supabase Edge Functions Configuration
+
+[functions.create-payment-intent]
+verify_jwt = false
+
+[functions.public_get_menu]
+verify_jwt = false
