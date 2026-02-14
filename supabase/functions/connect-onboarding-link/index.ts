@@ -10,15 +10,21 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401 });
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -28,13 +34,13 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const { workspace_id, refresh_url, return_url } = await req.json();
 
     if (!workspace_id) {
-      return new Response(JSON.stringify({ error: 'workspace_id is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'workspace_id is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Verify user is owner of workspace
@@ -46,7 +52,7 @@ serve(async (req) => {
       .single();
 
     if (membershipError || !membership || membership.role !== 'owner') {
-      return new Response(JSON.stringify({ error: 'Only workspace owners can access onboarding' }), { status: 403 });
+      return new Response(JSON.stringify({ error: 'Only workspace owners can access onboarding' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Get workspace slug for URLs
@@ -68,7 +74,7 @@ serve(async (req) => {
       .single();
 
     if (accountError || !payoutAccount) {
-      return new Response(JSON.stringify({ error: 'Payout account not found. Create account first.' }), { status: 404 });
+      return new Response(JSON.stringify({ error: 'Payout account not found. Create account first.' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Create account link
@@ -99,14 +105,14 @@ serve(async (req) => {
       url: accountLink.url,
       expires_at: accountLink.expires_at,
     }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Error in connect-onboarding-link:', error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
