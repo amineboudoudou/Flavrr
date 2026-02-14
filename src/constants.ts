@@ -1,5 +1,5 @@
 
-import { MenuItem, Category, ThemeConfig, StorefrontReview, NewsPost, Language, LocalizedString } from './types';
+import { MenuItem, Category, ThemeConfig, StorefrontReview, NewsPost, Language, LocalizedString, OrganizationProfile } from './types';
 
 export const THEME: ThemeConfig = {
   primary: '#FF1493',
@@ -58,11 +58,163 @@ export const UI_STRINGS: Record<string, Record<Language, string>> = {
   taxesIncluded: { fr: "Taxes & Livraison incl.", en: "Taxes & Delivery incl." }
 };
 
-export const CATEGORIES: Category[] = [];
+export const CATEGORIES: Category[] = [
+  {
+    id: 'cat-signature',
+    label: { fr: 'Signatures du Chef', en: "Chef's Signatures" },
+    image: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=800&q=80',
+    vibe: {
+      fr: 'Le meilleur du griot, des parfums caribéens et des assiettes audacieuses.',
+      en: 'Griot classics and bold Caribbean plates.'
+    }
+  },
+  {
+    id: 'cat-brunch',
+    label: { fr: 'Brunch Soleil', en: 'Sunrise Brunch' },
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
+    vibe: {
+      fr: 'Un brunch tropical aux accents haïtiens.',
+      en: 'A tropical brunch with Haitian flair.'
+    }
+  },
+  {
+    id: 'cat-liquid',
+    label: { fr: 'Cocktails & Rituels', en: 'Cocktails & Rituals' },
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
+    vibe: {
+      fr: 'Mixologie, infusions et vibrations nocturnes.',
+      en: 'Mixology, infusions, late-night vibes.'
+    }
+  }
+];
 
-export const CATEGORY_METADATA: Record<string, { image: string; vibe: Record<Language, string> }> = {};
+export const CATEGORY_METADATA: Record<string, { image: string; vibe: Record<Language, string> }> = {
+  'cat-signature': {
+    image: CATEGORIES[0].image!,
+    vibe: CATEGORIES[0].vibe || { fr: '', en: '' }
+  },
+  'cat-brunch': {
+    image: CATEGORIES[1].image!,
+    vibe: CATEGORIES[1].vibe || { fr: '', en: '' }
+  },
+  'cat-liquid': {
+    image: CATEGORIES[2].image!,
+    vibe: CATEGORIES[2].vibe || { fr: '', en: '' }
+  }
+};
 
-export const MENU_ITEMS: MenuItem[] = [];
+export const MENU_ITEMS: MenuItem[] = [
+  {
+    id: 'dish-griot-royale',
+    name: { fr: 'Griot Royale', en: 'Royal Griot' },
+    description: {
+      fr: 'Porc mariné, pikliz flamboyant, plantains rôtis et sauce ti-malice.',
+      en: 'Marinated pork, fiery pikliz, roasted plantains and ti-malice sauce.'
+    },
+    price: 28,
+    image: 'https://images.unsplash.com/photo-1473093226795-af9932fe5856?auto=format&fit=crop&w=1200&q=80',
+    category: 'cat-signature',
+    ingredients: [
+      { fr: 'Porc fermier', en: 'Farm pork' },
+      { fr: 'Pikliz', en: 'Pikliz slaw' },
+      { fr: 'Plantain', en: 'Plantain' }
+    ],
+    allergens: ['Spicy'],
+    isBestSeller: true
+  },
+  {
+    id: 'dish-lakou-mer',
+    name: { fr: 'Lakou de la Mer', en: 'Lakou from the Sea' },
+    description: {
+      fr: 'Crevettes jerk, lait de coco fumé, riz djon djon et mangue verte.',
+      en: 'Jerk shrimp, smoked coconut milk, djon djon rice, green mango.'
+    },
+    price: 32,
+    image: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?auto=format&fit=crop&w=1200&q=80',
+    category: 'cat-signature',
+    ingredients: [
+      { fr: 'Crevettes', en: 'Shrimps' },
+      { fr: 'Riz djon djon', en: 'Djon djon rice' },
+      { fr: 'Mangue verte', en: 'Green mango' }
+    ],
+    allergens: ['Shellfish', 'Spicy']
+  },
+  {
+    id: 'dish-sunrise-pancakes',
+    name: { fr: 'Pancakes Soleil', en: 'Sunrise Pancakes' },
+    description: {
+      fr: 'Pancakes à la patate douce, sirop épicé et ricotta fouettée.',
+      en: 'Sweet potato pancakes, spiced syrup, whipped ricotta.'
+    },
+    price: 19,
+    image: 'https://images.unsplash.com/photo-1484723091739-30a097e8f929?auto=format&fit=crop&w=1200&q=80',
+    category: 'cat-brunch',
+    ingredients: [
+      { fr: 'Patate douce', en: 'Sweet potato' },
+      { fr: 'Ricotta', en: 'Ricotta' },
+      { fr: 'Sirop aux épices', en: 'Spiced syrup' }
+    ],
+    allergens: ['Dairy', 'Gluten']
+  },
+  {
+    id: 'dish-dous-mimo',
+    name: { fr: 'Dous Mimo', en: 'Dous Mimo' },
+    description: {
+      fr: 'Mimosa au champagne rosé, sorbet passion et fleur d’hibiscus.',
+      en: 'Rosé mimosa, passion sorbet, hibiscus blossom.'
+    },
+    price: 14,
+    image: 'https://images.unsplash.com/photo-1481391032119-d89fee407e44?auto=format&fit=crop&w=800&q=80',
+    category: 'cat-liquid',
+    ingredients: [
+      { fr: 'Champagne rosé', en: 'Rosé champagne' },
+      { fr: 'Fruit de la passion', en: 'Passion fruit' },
+      { fr: 'Hibiscus', en: 'Hibiscus' }
+    ],
+    allergens: []
+  },
+  {
+    id: 'dish-ti-punch-nuit',
+    name: { fr: 'Ti-Punch de Nuit', en: 'Midnight Ti-Punch' },
+    description: {
+      fr: 'Rhum épicé, sirop canne brûlé, lime confite et fumée de cacao.',
+      en: 'Spiced rum, burnt cane syrup, preserved lime, cacao smoke.'
+    },
+    price: 16,
+    image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=800&q=80',
+    category: 'cat-liquid',
+    ingredients: [
+      { fr: 'Rhum épicé', en: 'Spiced rum' },
+      { fr: 'Sirop de canne', en: 'Cane syrup' },
+      { fr: 'Lime confite', en: 'Preserved lime' }
+    ],
+    allergens: []
+  }
+];
+
+export const FALLBACK_ORGANIZATION: OrganizationProfile = {
+  id: 'demo-org',
+  name: 'Café du Griot',
+  slug: 'cafe-du-griot',
+  street: '123 Rue Sainte-Catherine',
+  city: 'Montréal',
+  region: 'QC',
+  postal_code: 'H2X 1Z6',
+  country: 'Canada',
+  address_json: null,
+  address_text: '123 Rue Sainte-Catherine, Montréal, QC',
+  settings: {
+    fulfillment_types: ['pickup', 'delivery'],
+    default_prep_time_minutes: 20,
+    tax_rate: 0.1495
+  },
+  business_hours: Array.from({ length: 7 }).map((_, idx) => ({
+    day_of_week: idx,
+    open_time: '11:00',
+    close_time: '23:00',
+    is_closed: false
+  }))
+};
 
 export const REVIEWS: StorefrontReview[] = [
   {

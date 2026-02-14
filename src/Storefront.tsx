@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { MenuItem, CartItem, Category, Language, OrganizationProfile, CheckoutStep } from './types';
-import { MENU_ITEMS, CATEGORIES, UI_STRINGS } from './constants';
+import { UI_STRINGS, CATEGORIES as FALLBACK_CATEGORIES, MENU_ITEMS as FALLBACK_MENU_ITEMS, FALLBACK_ORGANIZATION } from './constants';
 import { Header } from './components/Header';
 import { PlateCard } from './components/PlateCard';
 import { CartDrawer } from './components/CartDrawer';
@@ -18,6 +18,7 @@ import { NewsView } from './components/NewsView';
 import { CheckoutFlow } from './components/CheckoutFlow';
 import { useImagePreload } from './hooks/useImagePreload';
 import { api } from './lib/api';
+import { FullPageLoader } from './components/owner/FullPageLoader';
 
 const Storefront: React.FC = () => {
     const { slug } = useParams();
@@ -44,52 +45,78 @@ const Storefront: React.FC = () => {
 
     const [lastDeepLinkedItemId, setLastDeepLinkedItemId] = useState<string>('');
 
+    const buildFallbackMenu = useCallback(() => {
+        return FALLBACK_CATEGORIES.map((cat) => ({
+            id: cat.id,
+            label: cat.label,
+            image: cat.image,
+            vibe: cat.vibe,
+            items: FALLBACK_MENU_ITEMS.filter(item => item.category === cat.id)
+        }));
+    }, []);
+
+    const hydrateMenu = useCallback((orgData: OrganizationProfile, menuData: any[]) => {
+        setOrganization(orgData);
+        const normalizedCategories = menuData.map((cat: any) => ({
+            id: cat.id,
+            label: cat.label,
+            image: cat.image,
+            vibe: cat.vibe,
+        }));
+        const flattenedItems: MenuItem[] = menuData.reduce((acc: MenuItem[], cat: any) => {
+            const items = (cat.items || []).map((item: any) => ({
+                ...item,
+                category: item.category || cat.id
+            }));
+            return [...acc, ...items];
+        }, []);
+
+        setCategories(normalizedCategories);
+        setMenuItems(flattenedItems);
+        if (menuData.length > 0) {
+            setActiveCategory(menuData[0].id);
+        }
+    }, []);
+
     useEffect(() => {
         let isMounted = true;
         const loadMenu = async () => {
             console.log('🔄 Loading menu data...');
+            let payload: { organization: OrganizationProfile; menu: any[] } | null = null;
+
             try {
                 if (isMounted) setLoading(true);
-
                 const orgSlug = slug || 'cafe-du-griot';
-                const response = await api.publicGetMenu(orgSlug);
-
-                console.log(`✅ Loaded ${response.menu.length} categories.`);
-
-                if (isMounted) {
-                    setOrganization(response.organization);
-                    setCategories(response.menu || []);
-
-                    // Flatten items for internal use
-                    const allItems = response.menu.reduce((acc: MenuItem[], cat: any) => {
-                        return [...acc, ...cat.items];
-                    }, []);
-                    setMenuItems(allItems);
-
-                    if (response.menu && response.menu.length > 0) {
-                        setActiveCategory(response.menu[0].id);
-                    }
-                }
+                payload = await api.publicGetMenu(orgSlug);
+                console.log(`✅ Loaded ${payload.menu.length} categories.`);
             } catch (error: any) {
-                if (error.message === 'TIMEOUT') {
-                    console.warn('⚠️ Menu fetch timed out. Check Supabase connectivity.');
+                if (error?.message === 'TIMEOUT') {
+                    console.warn('⚠️ Menu fetch timed out. Using fallback menu.');
                     setToastMessage('Menu load taking longer than expected...');
-                } else if (error.name === 'AbortError' || error.message?.includes('aborted')) {
-                    console.log('ℹ️ Component navigation or strict mode aborted fetch.');
-                } else {
+                } else if (error?.name !== 'AbortError') {
                     console.error('❌ Failed to load menu:', error);
-                    setToastMessage('Failed to load menu data');
+                    setToastMessage('Impossible de charger le menu en direct.');
                 }
             } finally {
                 if (isMounted) {
-                    console.log('🏁 Loading state cleared.');
+                    const shouldUseFallback = !payload || !payload.menu || payload.menu.length === 0;
+                    if (shouldUseFallback) {
+                        console.log('ℹ️ Falling back to curated Café du Griot menu.');
+                        payload = {
+                            organization: FALLBACK_ORGANIZATION,
+                            menu: buildFallbackMenu()
+                        };
+                    }
+
+                    hydrateMenu(payload.organization, payload.menu);
                     setLoading(false);
                 }
             }
         };
+
         loadMenu();
         return () => { isMounted = false; };
-    }, [slug]);
+    }, [slug, buildFallbackMenu, hydrateMenu]);
 
     const filteredItems = useMemo(() => {
         if (!activeCategory) return [];
@@ -267,12 +294,10 @@ const Storefront: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-pink-600 border-t-transparent rounded-full animate-spin"></div>
-                    <p className="text-pink-500 font-serif tracking-widest animate-pulse">CHARGEMENT DU MENU...</p>
-                </div>
-            </div>
+            <FullPageLoader
+                message={lang === 'fr' ? 'Chargement du menu…' : 'Loading menu…'}
+                subtext={lang === 'fr' ? 'Merci de patienter une seconde' : 'Setting the table for you'}
+            />
         );
     }
 
