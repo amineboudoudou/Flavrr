@@ -535,10 +535,10 @@ export const Settings: React.FC = () => {
                     {activeTab === 'storefront' && (
                         <div className="space-y-6">
                             {/* Main Card */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                                 <div className="mb-6">
-                                    <h2 className="text-white text-lg font-semibold mb-2">Your Ordering Link</h2>
-                                    <p className="text-white/60 text-sm">
+                                    <h2 className="text-slate-900 text-lg font-semibold tracking-tight mb-2">Your Ordering Link</h2>
+                                    <p className="text-slate-600 text-sm">
                                         Share this link with your customers on Instagram, TikTok, or anywhere else. They can browse your menu and place orders directly.
                                     </p>
                                 </div>
@@ -546,10 +546,10 @@ export const Settings: React.FC = () => {
                                 {/* Link Display & Copy */}
                                 <div className="space-y-4">
                                     <div>
-                                        <label className="block text-white/70 text-sm mb-2 font-medium">Your Custom Link</label>
+                                        <label className="block text-slate-700 text-sm mb-2 font-medium">Your Custom Link</label>
                                         <div className="flex gap-3">
-                                            <div className="flex-1 bg-neutral-900 border border-white/10 rounded-lg px-4 py-3 text-white font-mono text-sm flex items-center">
-                                                <span className="text-white/40 mr-1">https://flavrr.app/</span>
+                                            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-4 py-3 text-slate-900 font-mono text-sm flex items-center">
+                                                <span className="text-slate-500 mr-1">https://flavrr.app/</span>
                                                 <span className="text-primary font-semibold">{settings.slug}</span>
                                             </div>
                                             <button
@@ -559,7 +559,7 @@ export const Settings: React.FC = () => {
                                                     setCopied(true);
                                                     setTimeout(() => setCopied(false), 2000);
                                                 }}
-                                                className="bg-primary hover:bg-accent text-white px-6 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+                                                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-6 py-3 rounded-lg transition-colors font-medium flex items-center gap-2 whitespace-nowrap shadow-sm"
                                             >
                                                 {copied ? (
                                                     <>
@@ -581,7 +581,7 @@ export const Settings: React.FC = () => {
                                     </div>
 
                                     {/* Slug Customization */}
-                                    <div className="bg-neutral-900/50 border border-white/5 rounded-lg p-5">
+                                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-5">
                                         <div className="flex items-start gap-3">
                                             <div className="flex-shrink-0 w-10 h-10 bg-blue-500/10 rounded-lg flex items-center justify-center">
                                                 <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -600,49 +600,49 @@ export const Settings: React.FC = () => {
                             </div>
 
                             {/* Usage Tips */}
-                            <div className="bg-gradient-to-br from-pink-500/10 to-purple-500/10 border border-pink-500/20 rounded-xl p-6">
-                                <h3 className="text-white font-semibold mb-4 flex items-center gap-2">
-                                    <svg className="w-5 h-5 text-pink-400" fill="currentColor" viewBox="0 0 20 20">
+                            <div className="bg-gradient-to-br from-orange-50 to-pink-50 border border-orange-200 rounded-2xl p-6">
+                                <h3 className="text-slate-900 font-semibold tracking-tight mb-4 flex items-center gap-2">
+                                    <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
                                         <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                                     </svg>
                                     Pro Tips for Maximum Orders
                                 </h3>
                                 <div className="space-y-3">
                                     <div className="flex gap-3">
-                                        <div className="flex-shrink-0 w-6 h-6 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 text-xs font-bold">1</div>
+                                        <div className="flex-shrink-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xs font-bold">1</div>
                                         <div>
-                                            <p className="text-white font-medium text-sm">Instagram Bio</p>
-                                            <p className="text-white/60 text-sm">Add your link to your Instagram bio so followers can order instantly</p>
+                                            <p className="text-slate-900 font-medium text-sm">Instagram Bio</p>
+                                            <p className="text-slate-600 text-xs mt-1">Add your link to your Instagram bio so followers can order instantly</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
-                                        <div className="flex-shrink-0 w-6 h-6 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 text-xs font-bold">2</div>
+                                        <div className="flex-shrink-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xs font-bold">2</div>
                                         <div>
-                                            <p className="text-white font-medium text-sm">TikTok & Stories</p>
-                                            <p className="text-white/60 text-sm">Share your link in TikTok videos and Instagram stories to drive traffic</p>
+                                            <p className="text-slate-900 font-medium text-sm">TikTok & Stories</p>
+                                            <p className="text-slate-600 text-xs mt-1">Share your link in TikTok videos and Instagram stories to drive traffic</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
-                                        <div className="flex-shrink-0 w-6 h-6 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 text-xs font-bold">3</div>
+                                        <div className="flex-shrink-0 w-6 h-6 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 text-xs font-bold">3</div>
                                         <div>
-                                            <p className="text-white font-medium text-sm">QR Code</p>
-                                            <p className="text-white/60 text-sm">Generate a QR code for your link and add it to flyers, packaging, or your storefront</p>
+                                            <p className="text-slate-900 font-medium text-sm">QR Code</p>
+                                            <p className="text-slate-600 text-xs mt-1">Generate a QR code for your link and add it to flyers, packaging, or your storefront</p>
                                         </div>
                                     </div>
                                     <div className="flex gap-3">
                                         <div className="flex-shrink-0 w-6 h-6 bg-pink-500/20 rounded-full flex items-center justify-center text-pink-400 text-xs font-bold">4</div>
                                         <div>
-                                            <p className="text-white font-medium text-sm">WhatsApp & SMS</p>
-                                            <p className="text-white/60 text-sm">Send your link directly to customers via WhatsApp or text message</p>
+                                            <p className="text-slate-900 font-medium text-sm">WhatsApp & SMS</p>
+                                            <p className="text-slate-600 text-xs mt-1">Send your link directly to customers via WhatsApp or text message</p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             {/* QR Code Section */}
-                            <div className="bg-neutral-800 border border-white/10 rounded-xl p-6">
-                                <h3 className="text-white font-semibold mb-2">QR Code</h3>
-                                <p className="text-white/60 text-sm mb-4">
+                            <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                                <h3 className="text-slate-900 font-semibold tracking-tight mb-2">QR Code</h3>
+                                <p className="text-slate-600 text-sm mb-4">
                                     Generate a QR code that links directly to your storefront. Perfect for print materials!
                                 </p>
                                 <a
