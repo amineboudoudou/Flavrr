@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.public_get_menu]
 verify_jwt = false
+
+[functions.connect-create-account]
+verify_jwt = false
+
+[functions.connect-onboarding-link]
+verify_jwt = false

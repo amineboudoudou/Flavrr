@@ -9,32 +9,82 @@ const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+
+// CORS helper: Allow production + Vercel preview domains
+const ALLOWED_ORIGINS = [
+  'https://flavrr-snowy.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+];
+
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  let allowedOrigin = 'https://flavrr-snowy.vercel.app'; // default to prod
+  
+  if (origin) {
+    // Allow exact matches from allowlist
+    if (ALLOWED_ORIGINS.includes(origin)) {
+      allowedOrigin = origin;
+    }
+    // Allow any Vercel preview domain
+    else if (origin.endsWith('.vercel.app')) {
+      allowedOrigin = origin;
+    }
+  }
+  
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Handle OPTIONS preflight - return 200 immediately with CORS headers
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type' } });
+    return new Response('ok', { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   try {
+    // Manual JWT verification (since verify_jwt=false at gateway)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { status: 401 });
+      return new Response(JSON.stringify({ error: 'Missing authorization header' }), { 
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Verify user is authenticated
+    // Verify JWT using Supabase client with ANON key (secure verification)
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+      console.error('Auth verification failed:', authError);
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
+
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { workspace_id, email, business_name, country = 'CA' } = await req.json();
 
     if (!workspace_id) {
-      return new Response(JSON.stringify({ error: 'workspace_id is required' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'workspace_id is required' }), { 
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Verify user is owner of workspace
@@ -46,7 +96,10 @@ serve(async (req) => {
       .single();
 
     if (membershipError || !membership || membership.role !== 'owner') {
-      return new Response(JSON.stringify({ error: 'Only workspace owners can create payout accounts' }), { status: 403 });
+      return new Response(JSON.stringify({ error: 'Only workspace owners can create payout accounts' }), { 
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     // Check if account already exists
@@ -64,7 +117,7 @@ serve(async (req) => {
         payouts_enabled: existingAccount.payouts_enabled,
         already_exists: true
       }), {
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -105,7 +158,10 @@ serve(async (req) => {
 
     if (insertError) {
       console.error('Error storing payout account:', insertError);
-      return new Response(JSON.stringify({ error: 'Failed to store payout account' }), { status: 500 });
+      return new Response(JSON.stringify({ error: 'Failed to store payout account' }), { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
     return new Response(JSON.stringify({
@@ -114,14 +170,16 @@ serve(async (req) => {
       charges_enabled: account.charges_enabled || false,
       payouts_enabled: account.payouts_enabled || false,
     }), {
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
     console.error('Error in connect-create-account:', error);
+    const origin = req.headers.get('origin');
+    const errorCorsHeaders = getCorsHeaders(origin);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      headers: { ...errorCorsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
