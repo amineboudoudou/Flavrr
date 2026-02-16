@@ -136,7 +136,7 @@ serve(async (req) => {
     const workspace_id = workspace.id;
     console.log('Using workspace:', workspace_id, workspace.slug);
 
-    const baseUrl = Deno.env.get('APP_URL') || 'http://localhost:5173';
+    const baseUrl = Deno.env.get('PUBLIC_APP_URL') || 'https://flavrr-snowy.vercel.app';
     const defaultRefreshUrl = refresh_url || `${baseUrl}/app/${workspace.slug}/settings/payouts`;
     const defaultReturnUrl = return_url || `${baseUrl}/app/${workspace.slug}/settings/payouts?onboarding=complete`;
 
