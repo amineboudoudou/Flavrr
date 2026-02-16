@@ -148,40 +148,62 @@ serve(async (req) => {
 
       const order = delivery.order;
       
-      // Calculate fees (platform takes 10% + delivery cost)
-      const platformFeePercent = 0.10;
-      const platformFeeCents = Math.round(order.subtotal_cents * platformFeePercent);
-      const deliveryFeeCents = delivery.uber_cost_cents || 0;
-      const totalFeesCents = platformFeeCents + deliveryFeeCents;
-      const netAmountCents = order.total_cents - totalFeesCents;
-
-      // Create ledger entry
-      const { error: ledgerError } = await supabase
+      // IDEMPOTENCY CHECK: Verify ledger entry doesn't already exist
+      const { data: existingLedger } = await supabase
         .from('seller_ledger')
-        .insert({
-          workspace_id: order.workspace_id,
-          org_id: order.org_id,
-          order_id: order.id,
-          type: 'sale',
-          gross_amount_cents: order.total_cents,
-          fees_amount_cents: totalFeesCents,
-          net_amount_cents: netAmountCents,
-          currency: order.currency,
-          status: 'pending',
-          available_on: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // Available in 2 days
-          description: `Order #${order.id.slice(0, 8)} - ${order.customer_name || 'Customer'}`,
-          metadata: {
-            platform_fee_cents: platformFeeCents,
-            delivery_fee_cents: deliveryFeeCents,
-            subtotal_cents: order.subtotal_cents,
-            tax_cents: order.tax_cents,
-          }
-        });
+        .select('id')
+        .eq('order_id', order.id)
+        .eq('type', 'sale')
+        .single();
 
-      if (ledgerError) {
-        console.error('Failed to create ledger entry:', ledgerError);
+      if (existingLedger) {
+        console.log('Ledger entry already exists for order:', order.id);
+        // Idempotent success - do not create duplicate
       } else {
-        console.log('Seller ledger entry created successfully');
+        // Calculate fees (platform takes 10% + delivery cost)
+        const platformFeePercent = 0.10;
+        const platformFeeCents = Math.round(order.subtotal_cents * platformFeePercent);
+        const deliveryFeeCents = delivery.uber_cost_cents || 0;
+        const totalFeesCents = platformFeeCents + deliveryFeeCents;
+        const netAmountCents = order.total_cents - totalFeesCents;
+
+        // Create ledger entry with constraint violation protection
+        try {
+          const { error: ledgerError } = await supabase
+            .from('seller_ledger')
+            .insert({
+              workspace_id: order.workspace_id,
+              org_id: order.org_id,
+              order_id: order.id,
+              type: 'sale',
+              gross_amount_cents: order.total_cents,
+              fees_amount_cents: totalFeesCents,
+              net_amount_cents: netAmountCents,
+              currency: order.currency,
+              status: 'pending',
+              available_on: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // Available in 2 days
+              description: `Order #${order.id.slice(0, 8)} - ${order.customer_name || 'Customer'}`,
+              metadata: {
+                platform_fee_cents: platformFeeCents,
+                delivery_fee_cents: deliveryFeeCents,
+                subtotal_cents: order.subtotal_cents,
+                tax_cents: order.tax_cents,
+              }
+            });
+
+          if (ledgerError) {
+            // Check if error is unique constraint violation (idempotent case)
+            if (ledgerError.code === '23505' || ledgerError.message?.includes('unique_order_sale_ledger')) {
+              console.log('Ledger entry already exists (constraint violation) - idempotent success');
+            } else {
+              console.error('Failed to create ledger entry:', ledgerError);
+            }
+          } else {
+            console.log('Seller ledger entry created successfully');
+          }
+        } catch (error) {
+          console.error('Exception creating ledger entry:', error);
+        }
       }
     }
 
