@@ -8,11 +8,17 @@ const corsHeaders = {
 
 // State machine: valid transitions
 const VALID_TRANSITIONS: Record<string, string[]> = {
-    'awaiting_payment': ['incoming', 'canceled'],
-    'incoming': ['preparing', 'canceled'], // Owner accepts and starts prep
-    'preparing': ['ready'],
-    'ready': ['completed', 'out_for_delivery'],
-    'out_for_delivery': ['completed'],
+    'draft': ['pending_payment', 'canceled'],
+    'pending_payment': ['paid', 'canceled'],
+    'awaiting_payment': ['paid', 'canceled'],
+    'paid': ['accepted', 'preparing', 'canceled'], // After payment, can accept or start prep
+    'accepted': ['preparing', 'canceled'], // Accepted, ready to prepare
+    'incoming': ['accepted', 'preparing', 'canceled'], // Legacy: same as paid
+    'preparing': ['ready', 'canceled'],
+    'ready': ['completed', 'out_for_delivery', 'canceled'],
+    'out_for_delivery': ['completed', 'canceled'],
+    'completed': [], // Terminal state
+    'canceled': [], // Terminal state
     // Refunded can only be done by admin and from certain states
 }
 
