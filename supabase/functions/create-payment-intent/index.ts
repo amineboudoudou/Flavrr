@@ -371,13 +371,13 @@ serve(async (req) => {
       });
     }
 
-    // Create payment intent with destination charges
+    // Create payment intent - SIMPLIFIED: Direct charge without Connect for now
+    // TODO: Re-enable Connect destination charges once account is fully verified
     console.log('Attempting to create Stripe PaymentIntent', {
       amount: order.total_cents,
       currency: order.currency,
-      application_fee: applicationFeeCents,
-      destination: payoutAccount.stripe_connect_account_id,
-      order_id: orderId
+      order_id: orderId,
+      mode: 'direct_charge_simplified'
     });
 
     let paymentIntent;
@@ -385,22 +385,30 @@ serve(async (req) => {
       paymentIntent = await stripe.paymentIntents.create({
         amount: order.total_cents,
         currency: order.currency,
-        application_fee_amount: applicationFeeCents,
-        transfer_data: {
-          destination: payoutAccount.stripe_connect_account_id,
-        },
+        // Temporarily disabled: application_fee_amount and transfer_data
+        // application_fee_amount: applicationFeeCents,
+        // transfer_data: {
+        //   destination: payoutAccount.stripe_connect_account_id,
+        // },
         metadata: {
           workspace_id: workspace.id,
           workspace_slug: workspace.slug,
           order_id: orderId,
           customer_email: order.customer_email || '',
+          connect_account_id: payoutAccount.stripe_connect_account_id,
+          application_fee_cents: applicationFeeCents.toString(),
         },
-        description: `Order from ${workspace.name}`,
+        description: `Order #${order.order_number} from ${workspace.name}`,
       }, {
         idempotencyKey: `pi_${workspace.id}_${orderId}`
       });
 
-      console.log('✅ Payment intent created successfully:', paymentIntent.id);
+      console.log('✅ Payment intent created successfully:', {
+        payment_intent_id: paymentIntent.id,
+        amount: paymentIntent.amount,
+        currency: paymentIntent.currency,
+        status: paymentIntent.status
+      });
     } catch (stripeError: any) {
       console.error('❌ Stripe PaymentIntent creation failed:', {
         error: stripeError.message,
@@ -408,7 +416,7 @@ serve(async (req) => {
         code: stripeError.code,
         param: stripeError.param,
         order_id: orderId,
-        destination: payoutAccount.stripe_connect_account_id
+        raw_error: stripeError
       });
       
       return new Response(JSON.stringify({ 
