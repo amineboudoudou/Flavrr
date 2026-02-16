@@ -108,12 +108,13 @@ const PaymentForm = ({
 };
 
 export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, cartTotal, organization, workspaceSlug, onSuccess, initialStep = 'ITEMS', initialToken = '' }) => {
-    const [step, setStep] = useState<CheckoutStep>(initialStep);
+    const [step, setStep] = useState<CheckoutStep>(initialStep || 'ITEMS');
     const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('pickup');
     const [selectedSlot, setSelectedSlot] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [orderToken, setOrderToken] = useState<string>(initialToken);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [orderNumber, setOrderNumber] = useState<number | null>(null);
 
     // Reset state when opening/closing
     useEffect(() => {
@@ -280,6 +281,9 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                     if (res.client_secret) {
                         setClientSecret(res.client_secret);
                         setOrderToken(res.order_id);
+                        if (res.order_number) {
+                            setOrderNumber(res.order_number);
+                        }
                     }
                 } catch (err: any) {
                     console.error('Failed to init payment', err);
@@ -641,7 +645,7 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                             </div>
                             <div className="bg-white/5 p-6 rounded-2xl border border-white/5 max-w-sm mx-auto text-left space-y-2">
                                 <p className="text-[10px] text-white/40 uppercase font-black">{UI_STRINGS.orderNumber[lang]}</p>
-                                <p className="text-white font-mono text-lg text-pink-500">#{orderToken || 'Processing...'}</p>
+                                <p className="text-white font-mono text-lg text-pink-500">#{orderNumber || orderToken || 'Processing...'}</p>
                             </div>
 
                             {fulfillmentType === 'delivery' && (

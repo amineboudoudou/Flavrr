@@ -413,6 +413,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({
       order_id: orderId,
+      order_number: order.order_number,
       payment_intent_id: paymentIntent.id,
       client_secret: paymentIntent.client_secret,
       requestId,
