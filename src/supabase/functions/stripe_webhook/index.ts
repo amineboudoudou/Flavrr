@@ -197,14 +197,22 @@ serve(async (req) => {
         // PAYMENT INTENT SUCCEEDED (Direct Payment Intent flow - no Checkout Session)
         if (event.type === 'payment_intent.succeeded') {
             const paymentIntent = event.data.object as Stripe.PaymentIntent
+            console.log(`🔔 payment_intent.succeeded event received`, {
+                payment_intent_id: paymentIntent.id,
+                amount: paymentIntent.amount,
+                currency: paymentIntent.currency,
+                metadata: paymentIntent.metadata
+            })
+            
             const orderId = paymentIntent.metadata?.order_id
 
             if (!orderId) {
-                console.error('❌ Missing order_id from payment intent metadata')
+                console.error('❌ Missing order_id from payment intent metadata', paymentIntent.metadata)
                 return new Response('Missing metadata', { status: 400 })
             }
 
             console.log(`💳 Payment Intent succeeded: ${paymentIntent.id} for order ${orderId}`)
+            console.log(`🔍 Looking up order in database: ${orderId}`)
 
             // IDEMPOTENCY CHECK
             const { data: order, error: fetchError } = await supabaseAdmin
@@ -253,6 +261,7 @@ serve(async (req) => {
             }
 
             // UPDATE ORDER
+            console.log(`📝 Updating order ${orderId} to status='paid', payment_status='succeeded'`)
             const { error: updateError } = await supabaseAdmin
                 .from('orders')
                 .update({
@@ -272,6 +281,8 @@ serve(async (req) => {
                 console.error('❌ Failed to update order:', updateError)
                 return new Response('Database error', { status: 500 })
             }
+            
+            console.log(`✅ Successfully updated order ${orderId} to paid status`)
 
             // LOG EVENT
             await supabaseAdmin.from('order_events').insert({
