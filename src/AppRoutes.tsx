@@ -83,6 +83,9 @@ const AppRoutes: React.FC = () => {
                         {/* Public Tracking */}
                         <Route path="/t/:token" element={<PublicTracking />} />
 
+                        {/* Storefront at root slug - must be before catch-all */}
+                        <Route path="/:slug" element={<Storefront />} />
+
                         {/* Catch all - redirect to home */}
                         <Route path="*" element={<Navigate to="/" replace />} />
                         </Routes>
