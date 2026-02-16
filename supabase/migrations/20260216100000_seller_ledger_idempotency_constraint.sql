@@ -6,25 +6,25 @@
 -- Add unique constraint to prevent duplicate sale entries per order
 -- This ensures one and only one ledger entry per order for type='sale'
 
-DO $$ 
+DO $$
 BEGIN
-    -- Check if constraint already exists
+    -- Check if partial unique index already exists
     IF NOT EXISTS (
-        SELECT 1 
-        FROM pg_constraint 
-        WHERE conname = 'unique_order_sale_ledger'
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = 'public'
+        AND indexname = 'uniq_seller_ledger_order_sale'
     ) THEN
-        -- Add partial unique constraint (only for type='sale')
-        ALTER TABLE public.seller_ledger
-        ADD CONSTRAINT unique_order_sale_ledger
-        UNIQUE (order_id, type)
+        -- Create partial unique index (only for type='sale')
+        CREATE UNIQUE INDEX uniq_seller_ledger_order_sale
+        ON public.seller_ledger (order_id, type)
         WHERE type = 'sale';
-        
-        RAISE NOTICE 'Unique constraint unique_order_sale_ledger created successfully';
+
+        RAISE NOTICE 'Partial unique index uniq_seller_ledger_order_sale created successfully';
     ELSE
-        RAISE NOTICE 'Unique constraint unique_order_sale_ledger already exists';
+        RAISE NOTICE 'Partial unique index uniq_seller_ledger_order_sale already exists';
     END IF;
 END $$;
 
-COMMENT ON CONSTRAINT unique_order_sale_ledger ON public.seller_ledger 
+COMMENT ON INDEX uniq_seller_ledger_order_sale 
 IS 'Prevents duplicate sale ledger entries for the same order - financial idempotency protection';
