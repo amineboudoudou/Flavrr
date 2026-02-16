@@ -372,25 +372,55 @@ serve(async (req) => {
     }
 
     // Create payment intent with destination charges
-    const paymentIntent = await stripe.paymentIntents.create({
+    console.log('Attempting to create Stripe PaymentIntent', {
       amount: order.total_cents,
       currency: order.currency,
-      application_fee_amount: applicationFeeCents,
-      transfer_data: {
-        destination: payoutAccount.stripe_connect_account_id,
-      },
-      metadata: {
-        workspace_id: workspace.id,
-        workspace_slug: workspace.slug,
-        order_id: orderId,
-        customer_email: order.customer_email || '',
-      },
-      description: `Order from ${workspace.name}`,
-    }, {
-      idempotencyKey: `pi_${workspace.id}_${orderId}`
+      application_fee: applicationFeeCents,
+      destination: payoutAccount.stripe_connect_account_id,
+      order_id: orderId
     });
 
-    console.log('Payment intent created:', paymentIntent.id);
+    let paymentIntent;
+    try {
+      paymentIntent = await stripe.paymentIntents.create({
+        amount: order.total_cents,
+        currency: order.currency,
+        application_fee_amount: applicationFeeCents,
+        transfer_data: {
+          destination: payoutAccount.stripe_connect_account_id,
+        },
+        metadata: {
+          workspace_id: workspace.id,
+          workspace_slug: workspace.slug,
+          order_id: orderId,
+          customer_email: order.customer_email || '',
+        },
+        description: `Order from ${workspace.name}`,
+      }, {
+        idempotencyKey: `pi_${workspace.id}_${orderId}`
+      });
+
+      console.log('✅ Payment intent created successfully:', paymentIntent.id);
+    } catch (stripeError: any) {
+      console.error('❌ Stripe PaymentIntent creation failed:', {
+        error: stripeError.message,
+        type: stripeError.type,
+        code: stripeError.code,
+        param: stripeError.param,
+        order_id: orderId,
+        destination: payoutAccount.stripe_connect_account_id
+      });
+      
+      return new Response(JSON.stringify({ 
+        error: 'Failed to create payment intent', 
+        details: stripeError.message,
+        code: stripeError.code,
+        requestId 
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     // Update order status
     await supabase
