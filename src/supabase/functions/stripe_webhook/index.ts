@@ -194,6 +194,116 @@ serve(async (req) => {
             console.log(`✅ Order ${orderId} payments processed successfully. Fee=${stripeFee}, Net=${stripeNet}`)
         }
 
+        // PAYMENT INTENT SUCCEEDED (Direct Payment Intent flow - no Checkout Session)
+        if (event.type === 'payment_intent.succeeded') {
+            const paymentIntent = event.data.object as Stripe.PaymentIntent
+            const orderId = paymentIntent.metadata?.order_id
+
+            if (!orderId) {
+                console.error('❌ Missing order_id from payment intent metadata')
+                return new Response('Missing metadata', { status: 400 })
+            }
+
+            console.log(`💳 Payment Intent succeeded: ${paymentIntent.id} for order ${orderId}`)
+
+            // IDEMPOTENCY CHECK
+            const { data: order, error: fetchError } = await supabaseAdmin
+                .from('orders')
+                .select('status, payment_status')
+                .eq('id', orderId)
+                .single()
+
+            if (fetchError || !order) {
+                console.error('❌ Order not found:', fetchError)
+                return new Response('Order not found', { status: 404 })
+            }
+
+            if (order.payment_status === 'succeeded' || order.status === 'paid') {
+                console.log(`✅ Order ${orderId} already marked paid. Skipping.`)
+                return new Response('OK (Idempotent)', { status: 200 })
+            }
+
+            // FETCH STRIPE FINANCIALS
+            let stripeFee = 0
+            let stripeNet = 0
+            let stripeChargeId = null
+            let stripeBalanceTxId = null
+            let stripeCurrency = paymentIntent.currency?.toUpperCase()
+
+            try {
+                const charge = paymentIntent.latest_charge
+                if (charge) {
+                    stripeChargeId = typeof charge === 'string' ? charge : charge.id
+                    
+                    // Fetch full charge with balance transaction
+                    const fullCharge = await stripe.charges.retrieve(stripeChargeId, {
+                        expand: ['balance_transaction']
+                    })
+                    
+                    if (fullCharge.balance_transaction) {
+                        const balanceTx = fullCharge.balance_transaction as Stripe.BalanceTransaction
+                        stripeBalanceTxId = balanceTx.id
+                        stripeFee = balanceTx.fee
+                        stripeNet = balanceTx.net
+                        stripeCurrency = balanceTx.currency.toUpperCase()
+                    }
+                }
+            } catch (err) {
+                console.error('⚠️ Failed to fetch Stripe financials:', err)
+            }
+
+            // UPDATE ORDER
+            const { error: updateError } = await supabaseAdmin
+                .from('orders')
+                .update({
+                    status: 'paid',
+                    payment_status: 'succeeded',
+                    paid_at: new Date().toISOString(),
+                    stripe_payment_intent_id: paymentIntent.id,
+                    stripe_charge_id: stripeChargeId,
+                    stripe_balance_transaction_id: stripeBalanceTxId,
+                    stripe_fee_amount: stripeFee,
+                    stripe_net_amount: stripeNet,
+                    stripe_currency: stripeCurrency
+                })
+                .eq('id', orderId)
+
+            if (updateError) {
+                console.error('❌ Failed to update order:', updateError)
+                return new Response('Database error', { status: 500 })
+            }
+
+            // LOG EVENT
+            await supabaseAdmin.from('order_events').insert({
+                order_id: orderId,
+                previous_status: order.status,
+                new_status: 'paid',
+                changed_by: null,
+                metadata: {
+                    payment_intent_id: paymentIntent.id,
+                    event_id: event.id,
+                    fee: stripeFee,
+                    net: stripeNet
+                }
+            })
+
+            // UPDATE PAYMENT RECORD
+            await supabaseAdmin
+                .from('payments')
+                .update({
+                    status: 'succeeded',
+                    metadata: {
+                        payment_intent_id: paymentIntent.id,
+                        fee: stripeFee,
+                        net: stripeNet
+                    }
+                })
+                .eq('order_id', orderId)
+                .eq('stripe_payment_intent_id', paymentIntent.id)
+
+            console.log(`✅ Order ${orderId} marked as paid. Fee=${stripeFee}, Net=${stripeNet}`)
+        }
+
         return new Response('OK', { status: 200 })
 
     } catch (err) {
