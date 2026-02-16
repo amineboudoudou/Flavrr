@@ -40,7 +40,11 @@ serve(async (req) => {
             return new Response(err.message, { status: 400 })
         }
 
-        console.log(`🔔 Webhook received: ${event.type}`)
+        console.log(`🔔 Webhook received: ${event.type}`, {
+            event_id: event.id,
+            created: event.created,
+            livemode: event.livemode
+        })
 
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
@@ -198,37 +202,65 @@ serve(async (req) => {
         if (event.type === 'payment_intent.succeeded') {
             const paymentIntent = event.data.object as Stripe.PaymentIntent
             console.log(`🔔 payment_intent.succeeded event received`, {
+                event_id: event.id,
                 payment_intent_id: paymentIntent.id,
                 amount: paymentIntent.amount,
                 currency: paymentIntent.currency,
+                status: paymentIntent.status,
                 metadata: paymentIntent.metadata
             })
             
             const orderId = paymentIntent.metadata?.order_id
 
             if (!orderId) {
-                console.error('❌ Missing order_id from payment intent metadata', paymentIntent.metadata)
-                return new Response('Missing metadata', { status: 400 })
+                console.error('❌ Missing order_id from payment intent metadata', {
+                    event_id: event.id,
+                    payment_intent_id: paymentIntent.id,
+                    metadata: paymentIntent.metadata
+                })
+                // Return 200 to prevent retry, but log for debugging
+                return new Response(JSON.stringify({ warning: 'Missing order_id in metadata' }), { status: 200 })
             }
 
-            console.log(`💳 Payment Intent succeeded: ${paymentIntent.id} for order ${orderId}`)
-            console.log(`🔍 Looking up order in database: ${orderId}`)
+            console.log(`💳 Processing payment_intent.succeeded`, {
+                payment_intent_id: paymentIntent.id,
+                order_id: orderId,
+                amount_cents: paymentIntent.amount
+            })
 
             // IDEMPOTENCY CHECK
             const { data: order, error: fetchError } = await supabaseAdmin
                 .from('orders')
-                .select('status, payment_status')
+                .select('id, order_number, status, payment_status, workspace_id, org_id, total_cents')
                 .eq('id', orderId)
                 .single()
 
             if (fetchError || !order) {
-                console.error('❌ Order not found:', fetchError)
-                return new Response('Order not found', { status: 404 })
+                console.error('❌ Order not found in database', {
+                    order_id: orderId,
+                    error: fetchError?.message,
+                    event_id: event.id
+                })
+                // Return 200 to prevent retry - order may have been deleted
+                return new Response(JSON.stringify({ warning: 'Order not found' }), { status: 200 })
             }
 
+            console.log(`📦 Order found`, {
+                order_id: order.id,
+                order_number: order.order_number,
+                current_status: order.status,
+                current_payment_status: order.payment_status,
+                workspace_id: order.workspace_id
+            })
+
+            // Idempotency: skip if already processed
             if (order.payment_status === 'succeeded' || order.status === 'paid') {
-                console.log(`✅ Order ${orderId} already marked paid. Skipping.`)
-                return new Response('OK (Idempotent)', { status: 200 })
+                console.log(`✅ Order ${order.order_number} already marked paid (idempotent)`, {
+                    order_id: order.id,
+                    status: order.status,
+                    payment_status: order.payment_status
+                })
+                return new Response(JSON.stringify({ status: 'already_processed' }), { status: 200 })
             }
 
             // FETCH STRIPE FINANCIALS
@@ -260,14 +292,24 @@ serve(async (req) => {
                 console.error('⚠️ Failed to fetch Stripe financials:', err)
             }
 
-            // UPDATE ORDER
-            console.log(`📝 Updating order ${orderId} to status='paid', payment_status='succeeded'`)
-            const { error: updateError } = await supabaseAdmin
+            // UPDATE ORDER TO PAID
+            const paidAt = new Date().toISOString()
+            console.log(`📝 Updating order to paid`, {
+                order_id: orderId,
+                order_number: order.order_number,
+                new_status: 'paid',
+                new_payment_status: 'succeeded',
+                stripe_payment_intent_id: paymentIntent.id,
+                stripe_fee: stripeFee,
+                stripe_net: stripeNet
+            })
+
+            const { data: updatedOrder, error: updateError } = await supabaseAdmin
                 .from('orders')
                 .update({
                     status: 'paid',
                     payment_status: 'succeeded',
-                    paid_at: new Date().toISOString(),
+                    paid_at: paidAt,
                     stripe_payment_intent_id: paymentIntent.id,
                     stripe_charge_id: stripeChargeId,
                     stripe_balance_transaction_id: stripeBalanceTxId,
@@ -276,13 +318,28 @@ serve(async (req) => {
                     stripe_currency: stripeCurrency
                 })
                 .eq('id', orderId)
+                .select('id, order_number, status, payment_status')
+                .single()
 
             if (updateError) {
-                console.error('❌ Failed to update order:', updateError)
-                return new Response('Database error', { status: 500 })
+                console.error('❌ Failed to update order', {
+                    order_id: orderId,
+                    error: updateError.message,
+                    code: updateError.code,
+                    details: updateError.details
+                })
+                return new Response(JSON.stringify({ error: 'Database update failed' }), { status: 500 })
             }
             
-            console.log(`✅ Successfully updated order ${orderId} to paid status`)
+            console.log(`✅ Order updated successfully`, {
+                order_id: updatedOrder.id,
+                order_number: updatedOrder.order_number,
+                status: updatedOrder.status,
+                payment_status: updatedOrder.payment_status,
+                paid_at: paidAt,
+                stripe_fee: stripeFee,
+                stripe_net: stripeNet
+            })
 
             // LOG EVENT
             await supabaseAdmin.from('order_events').insert({
@@ -312,7 +369,17 @@ serve(async (req) => {
                 .eq('order_id', orderId)
                 .eq('stripe_payment_intent_id', paymentIntent.id)
 
-            console.log(`✅ Order ${orderId} marked as paid. Fee=${stripeFee}, Net=${stripeNet}`)
+            console.log(`🎉 Payment processing complete`, {
+                order_id: orderId,
+                order_number: order.order_number,
+                payment_intent_id: paymentIntent.id,
+                event_id: event.id,
+                total_cents: order.total_cents,
+                stripe_fee_cents: stripeFee,
+                stripe_net_cents: stripeNet,
+                status: 'paid',
+                payment_status: 'succeeded'
+            })
         }
 
         return new Response('OK', { status: 200 })
