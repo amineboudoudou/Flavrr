@@ -85,44 +85,56 @@ serve(async (req) => {
             )
         }
 
+        console.log('📝 Step 1: Parsing request body...')
         // Parse request body
         const { order_id, new_status }: { order_id: string; new_status: string } = await req.json()
+        console.log('📝 Step 2: Request parsed:', { order_id, new_status })
 
         if (!order_id || !new_status) {
+            console.error('❌ Missing order_id or new_status')
             return new Response(
                 JSON.stringify({ error: 'Missing order_id or new_status' }),
                 { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
+        console.log('📝 Step 3: Creating supabase admin client...')
         // Use service role for atomic operations
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
+        console.log('📝 Step 4: Supabase admin client created')
 
+        console.log('📝 Step 5: Fetching order...')
         // Fetch current order
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
             .select('id, org_id, status, customer_email, customer_name, fulfillment_type, public_token, order_number')
             .eq('id', order_id)
             .single()
+        
+        console.log('📝 Step 6: Order fetch result:', { order: order ? 'Found' : 'Not found', error: orderError ? orderError.message : 'None' })
 
         if (orderError || !order) {
+            console.error('❌ Order not found:', orderError)
             return new Response(
                 JSON.stringify({ error: 'Order not found' }),
                 { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
+        console.log('📝 Step 7: Verifying org...')
         // Verify user belongs to order's org
         if (order.org_id !== profile.org_id) {
+            console.error('❌ Org mismatch:', { orderOrg: order.org_id, profileOrg: profile.org_id })
             return new Response(
                 JSON.stringify({ error: 'Unauthorized to update this order' }),
                 { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
+        console.log('📝 Step 8: Checking role permissions...')
         // Check role permissions
         if (new_status === 'refunded' && profile.role !== 'admin') {
             return new Response(
@@ -131,11 +143,13 @@ serve(async (req) => {
             )
         }
 
+        console.log('📝 Step 9: Validating status transition...')
         // Validate state transition
         const currentStatus = order.status
         const validNextStates = VALID_TRANSITIONS[currentStatus] || []
 
         if (!validNextStates.includes(new_status) && new_status !== 'refunded') {
+            console.error('❌ Invalid transition:', { current: currentStatus, requested: new_status, valid: validNextStates })
             return new Response(
                 JSON.stringify({
                     error: 'Invalid status transition',
@@ -147,6 +161,7 @@ serve(async (req) => {
             )
         }
 
+        console.log('📝 Step 10: Preparing update data...')
         // Prepare update data
         const updateData: Record<string, any> = {
             status: new_status,
@@ -164,6 +179,7 @@ serve(async (req) => {
             updateData.canceled_at = timestamp
         }
 
+        console.log('📝 Step 11: Updating order...', updateData)
         // Update order
         const { data: updatedOrder, error: updateError } = await supabaseAdmin
             .from('orders')
@@ -172,7 +188,10 @@ serve(async (req) => {
             .select('id, status, order_number, public_token, org_id, customer_email, customer_name, fulfillment_type')
             .single()
 
+        console.log('📝 Step 12: Update result:', { updatedOrder: updatedOrder ? 'Success' : 'Failed', error: updateError ? updateError.message : 'None' })
+
         if (updateError) {
+            console.error('❌ Update error:', updateError)
             throw updateError
         }
 
