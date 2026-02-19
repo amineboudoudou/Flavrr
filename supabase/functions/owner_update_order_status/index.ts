@@ -169,7 +169,7 @@ serve(async (req) => {
             .from('orders')
             .update(updateData)
             .eq('id', order_id)
-            .select()
+            .select('id, status, order_number, public_token, org_id, customer_email, customer_name, fulfillment_type')
             .single()
 
         if (updateError) {
@@ -177,71 +177,112 @@ serve(async (req) => {
         }
 
         // Create log event
-        await supabaseAdmin
-            .from('order_events')
-            .insert({
-                order_id: order_id,
-                previous_status: currentStatus,
-                new_status: new_status,
-                changed_by: user.id,
-                metadata: { source: 'owner_portal' }
-            })
+        try {
+            await supabaseAdmin
+                .from('order_events')
+                .insert({
+                    order_id: order_id,
+                    previous_status: currentStatus,
+                    new_status: new_status,
+                    changed_by: user.id,
+                    metadata: { source: 'owner_portal' }
+                })
+            console.log('📝 Order event logged')
+        } catch (eventErr) {
+            console.error('❌ Failed to log order event:', eventErr)
+        }
 
         // Create notification
-        await supabaseAdmin
-            .from('notifications')
-            .insert({
-                org_id: order.org_id,
-                user_id: null, // Org-wide
-                type: 'order_status',
-                payload: {
-                    order_id: order_id,
-                    old_status: currentStatus,
-                    new_status: new_status,
-                    updated_by: user.id,
-                },
-            })
+        try {
+            await supabaseAdmin
+                .from('notifications')
+                .insert({
+                    org_id: order.org_id,
+                    user_id: null, // Org-wide
+                    type: 'order_status',
+                    payload: {
+                        order_id: order_id,
+                        old_status: currentStatus,
+                        new_status: new_status,
+                        updated_by: user.id,
+                    },
+                })
+            console.log('🔔 Notification created')
+        } catch (notifErr) {
+            console.error('❌ Failed to create notification:', notifErr)
+        }
+
+        console.log('✅ Order status updated successfully:', new_status)
 
         if (new_status === 'ready') {
             try {
+                console.log('🔄 Processing ready status, fulfillment_type:', order.fulfillment_type);
                 // Handle Pickup Notification
                 if (order.fulfillment_type === 'pickup' && order.customer_email) {
+                    console.log('📧 Processing pickup notification for:', order.customer_email);
                     const resendApiKey = Deno.env.get('RESEND_API_KEY');
+                    console.log('🔑 Resend API key present:', !!resendApiKey);
                     if (resendApiKey) {
-                        const trackingUrl = `${req.headers.get('origin') || 'http://localhost:3000'}/order/${updatedOrder.public_token}`;
+                        const origin = req.headers.get('origin') || 'https://flavrr.co';
+                        console.log('🔗 Origin:', origin);
+                        console.log('📦 updatedOrder:', JSON.stringify(updatedOrder));
+                        
+                        // Safely get order number
+                        const orderNum = updatedOrder.order_number || order.order_number;
+                        const publicToken = updatedOrder.public_token || order.public_token;
+                        console.log('📝 Order number:', orderNum, 'Public token:', publicToken);
+                        
+                        if (!publicToken) {
+                            console.error('❌ Missing public_token for tracking URL');
+                        }
+                        
+                        const trackingUrl = `${origin}/t/${publicToken}`;
+                        const formattedOrderNum = orderNum ? orderNum.toString().padStart(4, '0') : 'N/A';
 
-                        await fetch('https://api.resend.com/emails', {
+                        const emailBody = {
+                            from: 'Flavrr <orders@flavrr.co>',
+                            to: [order.customer_email],
+                            subject: `Your order #${formattedOrderNum} is ready for pickup!`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                    <h1 style="color: #22c55e; font-size: 28px; margin-bottom: 20px;">✅ Order Ready!</h1>
+                                    <p style="font-size: 18px; color: #333;">Hi ${order.customer_name || 'Customer'},</p>
+                                    <p style="font-size: 16px; color: #555; line-height: 1.6;">
+                                        Great news! Your order <strong>#${formattedOrderNum}</strong> is ready for pickup.
+                                    </p>
+                                    <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                                        <p style="margin: 0; color: #64748b; font-size: 14px;">TRACK YOUR ORDER</p>
+                                        <a href="${trackingUrl}" 
+                                           style="display: inline-block; background: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
+                                            View Order Status
+                                        </a>
+                                    </div>
+                                    <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+                                        Thank you for ordering with Flavrr!
+                                    </p>
+                                </div>
+                            `
+                        };
+                        
+                        console.log('📤 Sending email to Resend...');
+                        const resendRes = await fetch('https://api.resend.com/emails', {
                             method: 'POST',
                             headers: {
                                 'Authorization': `Bearer ${resendApiKey}`,
                                 'Content-Type': 'application/json',
                             },
-                            body: JSON.stringify({
-                                from: 'Flavrr <orders@flavrr.co>',
-                                to: [order.customer_email],
-                                subject: `Your order #${updatedOrder.order_number.toString().padStart(4, '0')} is ready for pickup!`,
-                                html: `
-                                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                                        <h1 style="color: #22c55e; font-size: 28px; margin-bottom: 20px;">✅ Order Ready!</h1>
-                                        <p style="font-size: 18px; color: #333;">Hi ${order.customer_name},</p>
-                                        <p style="font-size: 16px; color: #555; line-height: 1.6;">
-                                            Great news! Your order <strong>#${updatedOrder.order_number.toString().padStart(4, '0')}</strong> is ready for pickup.
-                                        </p>
-                                        <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 25px 0;">
-                                            <p style="margin: 0; color: #64748b; font-size: 14px;">TRACK YOUR ORDER</p>
-                                            <a href="${req.headers.get('origin') || 'https://flavrr.co'}/t/${updatedOrder.public_token}" 
-                                               style="display: inline-block; background: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
-                                                View Order Status
-                                            </a>
-                                        </div>
-                                        <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
-                                            Thank you for ordering with Flavrr!
-                                        </p>
-                                    </div>
-                                `
-                            }),
+                            body: JSON.stringify(emailBody),
                         });
-                        console.log(`📧 Sent readiness email to ${order.customer_email}`);
+                        
+                        if (!resendRes.ok) {
+                            const resendErr = await resendRes.text();
+                            console.error('❌ Resend API error:', resendRes.status, resendErr);
+                        } else {
+                            const resendData = await resendRes.json();
+                            console.log(`✅ Email sent successfully:`, resendData);
+                        }
+                    } else {
+                        console.log('⚠️ No Resend API key configured, skipping email');
                     }
                 }
                 // Handle Delivery Logic (Uber Direct)
