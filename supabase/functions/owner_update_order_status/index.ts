@@ -136,15 +136,6 @@ serve(async (req) => {
             )
         }
 
-        // Non-blocking: log event
-        supabaseAdmin.from('order_events').insert({
-            order_id,
-            previous_status: currentStatus,
-            new_status,
-            changed_by: user.id,
-            metadata: { source: 'owner_portal' }
-        }).then(() => {}).catch(() => {})
-
         // Non-blocking: send email for pickup orders marked ready
         if (new_status === 'ready' && order.fulfillment_type === 'pickup' && order.customer_email) {
             const resendApiKey = Deno.env.get('RESEND_API_KEY')
