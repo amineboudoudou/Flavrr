@@ -207,7 +207,8 @@ serve(async (req) => {
                 amount: paymentIntent.amount,
                 currency: paymentIntent.currency,
                 status: paymentIntent.status,
-                metadata: paymentIntent.metadata
+                metadata: paymentIntent.metadata,
+                latest_charge: paymentIntent.latest_charge
             })
             
             const orderId = paymentIntent.metadata?.order_id

@@ -94,6 +94,28 @@ export const PublicTracking: React.FC = () => {
     );
   }
 
+  const getStatusMessage = () => {
+    switch (order.status) {
+      case 'paid':
+      case 'accepted':
+        return { title: 'Order Received', subtitle: 'We\'ve received your order and will start preparing soon.', icon: '📋', color: 'blue' };
+      case 'preparing':
+        return { title: 'Preparing Your Order', subtitle: 'Our kitchen is working on your delicious meal!', icon: '👨‍🍳', color: 'orange' };
+      case 'ready':
+        return order.fulfillment_type === 'pickup' 
+          ? { title: 'Ready for Pickup!', subtitle: 'Your order is ready! Come pick it up now.', icon: '✅', color: 'green' }
+          : { title: 'Ready for Delivery', subtitle: 'Your order is ready and will be delivered soon.', icon: '📦', color: 'purple' };
+      case 'out_for_delivery':
+        return { title: 'Out for Delivery', subtitle: 'Your order is on its way to you!', icon: '🚚', color: 'purple' };
+      case 'completed':
+        return { title: 'Order Completed', subtitle: 'Enjoy your meal! Thank you for ordering.', icon: '🎉', color: 'green' };
+      default:
+        return { title: 'Processing', subtitle: 'We\'re working on your order...', icon: '⏳', color: 'gray' };
+    }
+  };
+
+  const statusMessage = getStatusMessage();
+
   const statusSteps = [
     { key: 'incoming', label: 'Order Received', completed: true },
     { key: 'preparing', label: 'Preparing', completed: ['preparing', 'ready', 'out_for_delivery', 'completed'].includes(order.status) },
@@ -118,6 +140,26 @@ export const PublicTracking: React.FC = () => {
             </p>
             <p className="text-white/80 mt-2">Hello {order.customer_name}!</p>
           </div>
+
+          {/* Status Message */}
+          <div className={`mb-8 p-6 rounded-xl bg-${statusMessage.color}-500/10 border border-${statusMessage.color}-500/30`}>
+            <div className="flex items-center gap-4">
+              <span className="text-4xl">{statusMessage.icon}</span>
+              <div>
+                <h2 className={`text-${statusMessage.color}-400 text-xl font-bold`}>{statusMessage.title}</h2>
+                <p className="text-white/70 text-sm mt-1">{statusMessage.subtitle}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* ETA for Pickup */}
+          {order.fulfillment_type === 'pickup' && order.status === 'preparing' && (
+            <div className="mb-8 p-4 bg-blue-500/10 border border-blue-500/30 rounded-xl">
+              <p className="text-blue-400 text-sm font-semibold">⏱️ Estimated Ready Time</p>
+              <p className="text-white text-lg font-bold mt-1">15-25 minutes</p>
+              <p className="text-white/60 text-xs mt-1">We'll notify you when your order is ready!</p>
+            </div>
+          )}
 
           {/* Status Timeline */}
           <div className="space-y-4 mb-8">

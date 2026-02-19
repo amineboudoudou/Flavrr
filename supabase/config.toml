@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.stripe_webhook]
 verify_jwt = false
+
+[functions.owner_update_order_status]
+verify_jwt = false

@@ -221,11 +221,53 @@ export async function updateOrderStatus(
     orderId: string,
     status: OrderStatus
 ): Promise<Order> {
-    const response = await fetchWithAuth<{ success: boolean; order: Order }>('owner_update_order_status', {
-        method: 'POST',
-        body: { order_id: orderId, new_status: status },
-    });
-    return response.order;
+    // Special fetch for order status that doesn't redirect on 401
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        throw new ApiError('No active session', 'UNAUTHORIZED', 401);
+    }
+
+    const url = new URL(`${EDGE_FUNCTION_URL}/owner_update_order_status`);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+    try {
+        const response = await fetch(url.toString(), {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+                'apikey': SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({ order_id: orderId, new_status: status }),
+            signal: controller.signal,
+        });
+
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+            let errorData;
+            try {
+                errorData = await response.json();
+            } catch {
+                errorData = { error: await response.text() };
+            }
+            
+            // Don't redirect on 401 - just throw the error so we can see it
+            throw new ApiError(
+                errorData.error || `Failed to update order status: ${response.status}`,
+                'UPDATE_ERROR',
+                response.status
+            );
+        }
+
+        const data = await response.json();
+        return data.order;
+    } catch (error: any) {
+        clearTimeout(timeoutId);
+        if (error instanceof ApiError) throw error;
+        throw new ApiError(error.message || 'Request failed', 'UNKNOWN_ERROR');
+    }
 }
 
 export async function deleteOrder(orderId: string): Promise<void> {

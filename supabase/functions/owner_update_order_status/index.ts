@@ -30,28 +30,46 @@ serve(async (req) => {
     try {
         // Verify authentication
         const authHeader = req.headers.get('Authorization')
+        console.log('🔐 Auth header received:', authHeader ? 'Present' : 'Missing')
+        
         if (!authHeader) {
+            console.error('❌ Missing authorization header')
             return new Response(
                 JSON.stringify({ error: 'Missing authorization header' }),
                 { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
 
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')
+        const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+        console.log('🔧 Supabase config:', { url: supabaseUrl ? 'Set' : 'Missing', key: supabaseAnonKey ? 'Set' : 'Missing' })
+
         const supabaseClient = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            supabaseUrl ?? '',
+            supabaseAnonKey ?? '',
             { global: { headers: { Authorization: authHeader } } }
         )
 
         // Get authenticated user
+        console.log('👤 Getting user from auth...')
         const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+        
+        if (userError) {
+            console.error('❌ Auth error details:', userError)
+        }
+        if (!user) {
+            console.error('❌ No user returned')
+        }
+        
         if (userError || !user) {
-            console.error('Auth error:', userError)
+            console.error('❌ Auth failed:', { error: userError?.message, user: user ? 'Present' : 'Missing' })
             return new Response(
                 JSON.stringify({ error: 'Unauthorized', details: userError?.message }),
                 { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
+        
+        console.log('✅ User authenticated:', user.id)
 
         // Get user's profile
         const { data: profile, error: profileError } = await supabaseClient
@@ -86,7 +104,7 @@ serve(async (req) => {
         // Fetch current order
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, org_id, status')
+            .select('id, org_id, status, customer_email, customer_name, fulfillment_type, public_token, order_number')
             .eq('id', order_id)
             .single()
 
@@ -199,14 +217,27 @@ serve(async (req) => {
                                 'Content-Type': 'application/json',
                             },
                             body: JSON.stringify({
-                                from: 'Lumière Dining <orders@lumiere.dining>',
+                                from: 'Flavrr <orders@flavrr.co>',
                                 to: [order.customer_email],
-                                subject: `Your order #${updatedOrder.order_number.toString().padStart(4, '0')} is ready!`,
+                                subject: `Your order #${updatedOrder.order_number.toString().padStart(4, '0')} is ready for pickup!`,
                                 html: `
-                                    <h1>Order Ready!</h1>
-                                    <p>Hi ${order.customer_name},</p>
-                                    <p>Your order is ready for pickup.</p>
-                                    <p><a href="${trackingUrl}">Track your order status</a></p>
+                                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                                        <h1 style="color: #22c55e; font-size: 28px; margin-bottom: 20px;">✅ Order Ready!</h1>
+                                        <p style="font-size: 18px; color: #333;">Hi ${order.customer_name},</p>
+                                        <p style="font-size: 16px; color: #555; line-height: 1.6;">
+                                            Great news! Your order <strong>#${updatedOrder.order_number.toString().padStart(4, '0')}</strong> is ready for pickup.
+                                        </p>
+                                        <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                                            <p style="margin: 0; color: #64748b; font-size: 14px;">TRACK YOUR ORDER</p>
+                                            <a href="${req.headers.get('origin') || 'https://flavrr.co'}/t/${updatedOrder.public_token}" 
+                                               style="display: inline-block; background: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
+                                                View Order Status
+                                            </a>
+                                        </div>
+                                        <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+                                            Thank you for ordering with Flavrr!
+                                        </p>
+                                    </div>
                                 `
                             }),
                         });
