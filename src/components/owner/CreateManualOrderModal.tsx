@@ -246,9 +246,10 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
     c.phone?.includes(searchQuery)
   );
 
-  const filteredProducts = products.filter(p =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Show all products by default, filter when searching
+  const displayedProducts = searchQuery.trim() 
+    ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
+    : products;
 
   const totals = calculateTotals();
 
@@ -378,25 +379,31 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
                 />
               </div>
 
-              {/* Products List */}
+              {/* Products List - Show all by default */}
               <div className="border rounded-xl divide-y max-h-64 overflow-y-auto">
-                {filteredProducts.map(product => (
-                  <div
-                    key={product.id}
-                    className="p-4 flex items-center justify-between hover:bg-gray-50"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{product.name}</p>
-                      <p className="text-sm text-gray-500">${(product.base_price_cents / 100).toFixed(2)}</p>
-                    </div>
-                    <button
-                      onClick={() => addItem(product)}
-                      className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600"
-                    >
-                      Add
-                    </button>
+                {displayedProducts.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400">
+                    {searchQuery ? 'No products found' : 'No products available'}
                   </div>
-                ))}
+                ) : (
+                  displayedProducts.map(product => (
+                    <div
+                      key={product.id}
+                      className="p-4 flex items-center justify-between hover:bg-gray-50"
+                    >
+                      <div>
+                        <p className="font-medium text-gray-900">{product.name}</p>
+                        <p className="text-sm text-gray-500">${(product.base_price_cents / 100).toFixed(2)}</p>
+                      </div>
+                      <button
+                        onClick={() => addItem(product)}
+                        className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
 
               {/* Selected Items */}
