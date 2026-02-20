@@ -11,6 +11,83 @@ const corsHeaders = {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Helper to send order confirmation email
+async function sendOrderConfirmationEmail(order: any, origin: string, resendApiKey: string) {
+    console.log('📧 Attempting to send confirmation email for order:', order.order_number)
+    
+    if (!order.customer_email) {
+        console.log('⚠️ No customer email found, skipping email')
+        return
+    }
+    if (!order.public_token) {
+        console.log('⚠️ No public_token found, skipping email')
+        return
+    }
+    if (!resendApiKey) {
+        console.log('⚠️ No RESEND_API_KEY found, skipping email')
+        return
+    }
+    
+    const orderNum = typeof order.order_number === 'number' 
+        ? order.order_number.toString().padStart(4, '0') 
+        : '0000'
+    const trackingUrl = `${origin}/t/${order.public_token}`
+    
+    console.log('📧 Sending email to:', order.customer_email)
+    
+    try {
+        const response = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${resendApiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                from: 'Flavrr <orders@flavrr.co>',
+                to: [order.customer_email],
+                subject: `Order #${orderNum} confirmed - Thank you for your order!`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                        <h1 style="color: #22c55e; font-size: 28px; margin-bottom: 20px;">🎉 Order Confirmed!</h1>
+                        <p style="font-size: 18px; color: #333;">Hi ${order.customer_name || 'Customer'},</p>
+                        <p style="font-size: 16px; color: #555; line-height: 1.6;">
+                            Thank you for your order! We've received your order <strong>#${orderNum}</strong> and it's being prepared.
+                        </p>
+                        <div style="background: #f8fafc; border-radius: 8px; padding: 20px; margin: 25px 0;">
+                            <p style="margin: 0; color: #64748b; font-size: 14px;">TRACK YOUR ORDER</p>
+                            <a href="${trackingUrl}" 
+                               style="display: inline-block; background: #22c55e; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; margin-top: 10px;">
+                                View Order Status
+                            </a>
+                            <p style="margin: 10px 0 0 0; color: #64748b; font-size: 12px;">
+                                ${trackingUrl}
+                            </p>
+                        </div>
+                        <p style="color: #555; font-size: 14px; line-height: 1.6;">
+                            <strong>What's next?</strong><br>
+                            • We'll notify you when your order is ready for pickup<br>
+                            • You can track your order status anytime using the link above
+                        </p>
+                        <p style="color: #64748b; font-size: 14px; margin-top: 30px;">
+                            Thank you for ordering with Flavrr!
+                        </p>
+                    </div>
+                `
+            })
+        })
+        
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('❌ Email send failed:', response.status, errorText)
+        } else {
+            const result = await response.json()
+            console.log('✅ Email sent successfully:', result.id)
+        }
+    } catch (err) {
+        console.error('❌ Email send error:', err)
+    }
+}
+
 serve(async (req) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
@@ -45,6 +122,9 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
+        
+        const resendApiKey = Deno.env.get('RESEND_API_KEY')
+        const origin = 'https://flavrr.co'
 
         // Handle checkout.session.completed
         if (event.type === 'checkout.session.completed') {
@@ -56,7 +136,14 @@ serve(async (req) => {
                 return new Response('Missing order_id', { status: 400 })
             }
 
-            // Update order to paid - fire and forget side effects
+            // Fetch order details for email
+            const { data: order } = await supabaseAdmin
+                .from('orders')
+                .select('id, order_number, customer_email, customer_name, public_token, fulfillment_type')
+                .eq('id', orderId)
+                .single()
+
+            // Update order to paid
             const { error: updateError } = await supabaseAdmin
                 .from('orders')
                 .update({
@@ -69,6 +156,11 @@ serve(async (req) => {
 
             if (updateError) {
                 return new Response('Database error', { status: 500 })
+            }
+
+            // Send order confirmation email
+            if (order && resendApiKey) {
+                sendOrderConfirmationEmail(order, origin, resendApiKey)
             }
 
             // Non-blocking: log event
@@ -102,7 +194,7 @@ serve(async (req) => {
             // Check if already processed
             const { data: order } = await supabaseAdmin
                 .from('orders')
-                .select('status, payment_status')
+                .select('status, payment_status, customer_email, public_token, order_number, customer_name, fulfillment_type')
                 .eq('id', orderId)
                 .single()
 
@@ -123,6 +215,11 @@ serve(async (req) => {
 
             if (updateError) {
                 return new Response('Database error', { status: 500 })
+            }
+
+            // Send order confirmation email (if not already sent via checkout.session)
+            if (order && resendApiKey && order.customer_email) {
+                sendOrderConfirmationEmail(order, origin, resendApiKey)
             }
 
             // Non-blocking: log event
