@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { Plus, X, Search, User, MapPin, CreditCard, Truck, Store } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { api } from '../../lib/api';
 
 interface Product {
   id: string;
@@ -75,26 +76,26 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
     }
     
     try {
-      console.log('Fetching products for workspace:', activeWorkspace.id);
+      console.log('Fetching products via API...');
       
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, base_price_cents, description, is_active')
-        .eq('workspace_id', activeWorkspace.id)
-        .order('name');
+      // Use the same API that works in MenuManagement
+      const items = await api.ownerListMenuItems();
       
-      if (error) {
-        console.error('Error fetching products:', error);
-        return;
-      }
+      console.log('Fetched menu items:', items?.length || 0, items);
       
-      console.log('Fetched products:', data?.length || 0, data);
+      // Transform menu_items to products format
+      const transformedProducts = items.map((item: any) => ({
+        id: item.id,
+        name: item.name_fr || item.name_en || item.name || 'Unnamed Product',
+        base_price_cents: item.price_cents || 0,
+        description: item.description_fr || item.description_en || item.description || '',
+        is_active: item.is_active !== false
+      }));
       
-      // Filter active products only
-      const activeProducts = data?.filter(p => p.is_active !== false) || [];
-      setProducts(activeProducts);
-    } catch (err) {
+      setProducts(transformedProducts);
+    } catch (err: any) {
       console.error('Exception fetching products:', err);
+      console.error('Error details:', err.message);
     }
   };
 
