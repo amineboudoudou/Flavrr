@@ -113,23 +113,9 @@ async function fetchWithAuth<T>(
                 hint: errorData.hint
             });
 
-            // If JWT is invalid, it likely means the session is from a different project
-            // or is corrupted. We should sign out to clear it.
-            if (response.status === 401 && (errorMsg.includes('JWT') || errorMsg.includes('Unauthorized') || errorMsg.includes('authorization') || errorMsg.includes('token'))) {
-                console.error('🔓 Invalid session detected, clearing and redirecting...');
-
-                // Use local logout to clear state immediately
-                localStorage.clear();
-
-                // Fire and forget logout
-                supabase.auth.signOut().catch(() => { });
-
-                // Force hard redirect to clear any stale state
-                window.location.href = '/login';
-
-                // Throw so the caller doesn't hang
-                throw new ApiError('Unauthorized - Redirecting...', 'UNAUTHORIZED', 401);
-            }
+            // REMOVED: Aggressive 401 redirect that was causing logout on status changes
+            // The AuthGate component handles session expiration properly
+            // Just throw the error and let the component handle it
 
             throw new ApiError(
                 errorMsg,
