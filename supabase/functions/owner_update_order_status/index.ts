@@ -178,6 +178,36 @@ serve(async (req) => {
             }
         }
 
+        // For delivery orders: trigger Uber delivery creation
+        if (new_status === 'ready' && order.fulfillment_type === 'delivery') {
+            console.log('🚚 Delivery order marked ready - triggering Uber delivery creation for order:', order_id)
+            
+            // Call uber_create_delivery via internal API
+            const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+            const functionsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/uber_create_delivery`
+            
+            fetch(functionsUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + serviceRoleKey,
+                    'X-Service-Role-Key': serviceRoleKey || '',
+                },
+                body: JSON.stringify({ order_id }),
+            }).then(async (response) => {
+                if (response.ok) {
+                    const result = await response.json()
+                    console.log('✅ Uber delivery created:', result.delivery_id || result.uber_delivery_id)
+                } else {
+                    const error = await response.text()
+                    console.error('❌ Failed to create Uber delivery:', error)
+                    // TODO: Notify owner of failure via notification/email
+                }
+            }).catch((err) => {
+                console.error('❌ Error calling uber_create_delivery:', err)
+            })
+        }
+
         return new Response(
             JSON.stringify({ success: true, order: updatedOrder }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
