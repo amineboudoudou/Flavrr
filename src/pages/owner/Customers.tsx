@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, X } from 'lucide-react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
 import { BrandedLoader } from '../../components/owner/BrandedLoader';
 import { api } from '../../lib/api';
+import { supabase } from '../../lib/supabase';
 import type { Customer } from '../../types';
 
 export const Customers: React.FC = () => {
@@ -11,6 +13,7 @@ export const Customers: React.FC = () => {
     const [search, setSearch] = useState('');
     const [sortBy, setSortBy] = useState<'total_spent' | 'order_count' | 'last_order_at'>('last_order_at');
     const [exporting, setExporting] = useState(false);
+    const [showCreateModal, setShowCreateModal] = useState(false);
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -102,6 +105,13 @@ export const Customers: React.FC = () => {
                         <option value="order_count">Order Count</option>
                     </select>
                     <button
+                        onClick={() => setShowCreateModal(true)}
+                        className="px-6 py-3 bg-pink-500 hover:bg-pink-600 text-white rounded-[var(--radius)] font-medium transition-colors flex items-center gap-2 shadow-[var(--shadow)]"
+                    >
+                        <Plus className="w-4 h-4" />
+                        Add Customer
+                    </button>
+                    <button
                         onClick={handleExportCSV}
                         disabled={exporting}
                         className="px-6 py-3 bg-primary hover:bg-accent text-white rounded-[var(--radius)] font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shadow-[var(--shadow)]"
@@ -179,7 +189,172 @@ export const Customers: React.FC = () => {
                         ))}
                     </div>
                 )}
+
+                {/* Create Customer Modal */}
+                {showCreateModal && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
+                        <CreateCustomerModal 
+                            onClose={() => setShowCreateModal(false)} 
+                            onCustomerCreated={() => {
+                                fetchCustomers();
+                                setShowCreateModal(false);
+                            }}
+                        />
+                    </div>
+                )}
             </div>
         </OwnerLayout>
+    );
+};
+
+// Create Customer Modal Component
+const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: () => void }> = ({ onClose, onCustomerCreated }) => {
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [phone, setPhone] = useState('');
+    const [address, setAddress] = useState({ street: '', city: '', region: '', postal_code: '', country: 'CA' });
+    const [loading, setLoading] = useState(false);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!name.trim()) return;
+
+        setLoading(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('Not authenticated');
+
+            const { data: { user } } = await supabase.auth.getUser();
+            
+            // Get workspace
+            const { data: membership } = await supabase
+                .from('workspace_memberships')
+                .select('workspace_id')
+                .eq('user_id', user?.id)
+                .single();
+
+            if (!membership) throw new Error('No workspace found');
+
+            const { error } = await supabase
+                .from('customers')
+                .insert({
+                    workspace_id: membership.workspace_id,
+                    name: name.trim(),
+                    email: email.trim() || null,
+                    phone: phone.trim() || null,
+                    address: address.street ? JSON.stringify(address) : null,
+                    first_order_at: new Date().toISOString(),
+                    last_order_at: new Date().toISOString(),
+                    total_orders: 0,
+                    total_spent_cents: 0,
+                });
+
+            if (error) throw error;
+            
+            onCustomerCreated();
+        } catch (error: any) {
+            alert('Error creating customer: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-gray-900">Add New Customer</h2>
+                <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
+                    <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                        placeholder="Customer name"
+                        required
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                        placeholder="email@example.com"
+                    />
+                </div>
+
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                        placeholder="(555) 123-4567"
+                    />
+                </div>
+
+                <div className="border-t pt-4 mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address (Optional)</label>
+                    <input
+                        type="text"
+                        value={address.street}
+                        onChange={(e) => setAddress({ ...address, street: e.target.value })}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 mb-2"
+                        placeholder="Street address"
+                    />
+                    <div className="grid grid-cols-2 gap-2">
+                        <input
+                            type="text"
+                            value={address.city}
+                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
+                            className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                            placeholder="City"
+                        />
+                        <input
+                            type="text"
+                            value={address.region}
+                            onChange={(e) => setAddress({ ...address, region: e.target.value })}
+                            className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                            placeholder="Province/State"
+                        />
+                    </div>
+                    <input
+                        type="text"
+                        value={address.postal_code}
+                        onChange={(e) => setAddress({ ...address, postal_code: e.target.value })}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 mt-2"
+                        placeholder="Postal Code"
+                    />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="flex-1 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={loading || !name.trim()}
+                        className="flex-1 py-3 bg-pink-500 text-white rounded-xl font-medium hover:bg-pink-600 disabled:opacity-50"
+                    >
+                        {loading ? 'Creating...' : 'Create Customer'}
+                    </button>
+                </div>
+            </form>
+        </div>
     );
 };

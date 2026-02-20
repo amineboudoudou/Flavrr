@@ -317,10 +317,16 @@ serve(async (req) => {
     }
 
     // Verify order is in correct state - more permissive for retry scenarios
-    const validPaymentStatuses = ['draft', 'pending_payment', 'awaiting_payment', 'unpaid'];
+    // Note: 'ready' status should ideally not be paid, but we allow it for edge cases
+    const validPaymentStatuses = ['draft', 'pending_payment', 'awaiting_payment', 'unpaid', 'ready'];
     if (!validPaymentStatuses.includes(order.status)) {
       console.error('Order status check failed:', { order_id: orderId, current_status: order.status, valid_statuses: validPaymentStatuses });
       return new Response(JSON.stringify({ error: `Order cannot be paid in current status: ${order.status}`, requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    
+    // Warn if order is already in ready status - this is unusual
+    if (order.status === 'ready') {
+      console.warn('⚠️ Order is in ready status but payment is being attempted:', { order_id: orderId, order_number: order.order_number });
     }
 
     // Check if payment already exists
