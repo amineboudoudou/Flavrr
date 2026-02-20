@@ -41,7 +41,7 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [showProductModal, setShowProductModal] = useState(false);
   
   // Form state
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -256,19 +256,16 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
     });
     setPaymentMethod('cash_on_pickup');
     setNotes('');
-    setSearchQuery('');
+    setShowProductModal(false);
   };
 
-  const filteredCustomers = customers.filter(c => 
-    c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    c.phone?.includes(searchQuery)
-  );
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
-  // Show all products by default, filter when searching
-  const displayedProducts = searchQuery.trim() 
-    ? products.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : products;
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    c.email?.toLowerCase().includes(customerSearchQuery.toLowerCase()) ||
+    c.phone?.includes(customerSearchQuery)
+  );
 
   const totals = calculateTotals();
 
@@ -317,14 +314,14 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
                 <input
                   type="text"
                   placeholder="Search existing customers..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 />
               </div>
 
               {/* Existing Customers */}
-              {searchQuery && filteredCustomers.length > 0 && (
+              {customerSearchQuery && filteredCustomers.length > 0 && (
                 <div className="border rounded-xl divide-y max-h-48 overflow-y-auto">
                   {filteredCustomers.map(customer => (
                     <button
@@ -387,43 +384,14 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
           {/* Step 2: Items Selection */}
           {step === 'items' && (
             <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                />
-              </div>
-
-              {/* Products List - Show all by default */}
-              <div className="border rounded-xl divide-y max-h-64 overflow-y-auto">
-                {displayedProducts.length === 0 ? (
-                  <div className="p-8 text-center text-gray-400">
-                    {searchQuery ? 'No products found' : 'No products available'}
-                  </div>
-                ) : (
-                  displayedProducts.map(product => (
-                    <div
-                      key={product.id}
-                      className="p-4 flex items-center justify-between hover:bg-gray-50"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">{product.name}</p>
-                        <p className="text-sm text-gray-500">${(product.base_price_cents / 100).toFixed(2)}</p>
-                      </div>
-                      <button
-                        onClick={() => addItem(product)}
-                        className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600"
-                      >
-                        Add
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+              {/* Browse Products Button */}
+              <button
+                onClick={() => setShowProductModal(true)}
+                className="w-full py-4 border-2 border-dashed border-pink-300 rounded-xl flex items-center justify-center gap-2 text-pink-600 hover:bg-pink-50 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="font-medium">Browse Products</span>
+              </button>
 
               {/* Selected Items */}
               {orderItems.length > 0 && (
@@ -665,6 +633,118 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Product Selector Modal */}
+      {showProductModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div 
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm" 
+            onClick={() => setShowProductModal(false)} 
+          />
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-bold text-gray-900">Select Products</h3>
+              <button 
+                onClick={() => setShowProductModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {products.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p>No products available</p>
+                  <p className="text-sm mt-2">Make sure you have products in your workspace</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {products.map(product => {
+                    const existingItem = orderItems.find(item => item.product_id === product.id);
+                    const quantity = existingItem?.quantity || 0;
+                    
+                    return (
+                      <div 
+                        key={product.id}
+                        className="border rounded-xl p-4 hover:border-pink-300 transition-colors"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{product.name}</h4>
+                            <p className="text-sm text-gray-500">
+                              ${(product.base_price_cents / 100).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {product.description && (
+                          <p className="text-xs text-gray-400 mb-3 line-clamp-2">
+                            {product.description}
+                          </p>
+                        )}
+                        
+                        <div className="flex items-center justify-between mt-3">
+                          {quantity > 0 ? (
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => updateQuantity(product.id, quantity - 1)}
+                                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center"
+                              >
+                                -
+                              </button>
+                              <span className="w-8 text-center font-medium">{quantity}</span>
+                              <button
+                                onClick={() => updateQuantity(product.id, quantity + 1)}
+                                className="w-8 h-8 rounded-full bg-pink-100 hover:bg-pink-200 text-pink-600 flex items-center justify-center"
+                              >
+                                +
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => addItem(product)}
+                              className="px-4 py-2 bg-pink-500 text-white rounded-lg text-sm font-medium hover:bg-pink-600"
+                            >
+                              Add to Order
+                            </button>
+                          )}
+                          
+                          {quantity > 0 && (
+                            <span className="text-sm text-pink-600 font-medium">
+                              ${((product.base_price_cents * quantity) / 100).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t p-6 flex justify-between items-center">
+              <div>
+                <span className="text-sm text-gray-500">
+                  {orderItems.reduce((sum, i) => sum + i.quantity, 0)} items selected
+                </span>
+                <p className="font-medium">
+                  Total: ${(totals.total_cents / 100).toFixed(2)}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowProductModal(false)}
+                className="px-6 py-3 bg-pink-500 text-white rounded-xl font-medium hover:bg-pink-600"
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
