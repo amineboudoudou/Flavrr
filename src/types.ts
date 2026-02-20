@@ -121,6 +121,7 @@ export interface Order {
   id: string;
   org_id: string;
   order_number: number;
+  public_token?: string;
   status: OrderStatus;
   fulfillment_type: FulfillmentType;
 

@@ -9,7 +9,7 @@ import { DeliveryPanel } from '../../components/owner/DeliveryPanel';
 import { DeliveryStatus } from '../../components/owner/DeliveryStatus';
 import { ChevronLeft } from '../../components/Icons';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { Trash2 } from 'lucide-react';
+import { Trash2, ExternalLink } from 'lucide-react';
 import type { Order } from '../../types';
 import { api } from '../../lib/api';
 
@@ -255,6 +255,19 @@ export const OrderDetail: React.FC = () => {
                                 onStatusChange={handleStatusChange}
                                 onDeliveryCreated={handleDeliveryCreated}
                             />
+
+                            {/* Track Order Button */}
+                            {order.public_token && (
+                                <a
+                                    href={`/t/${order.public_token}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-4 flex items-center justify-center gap-2 w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
+                                >
+                                    <ExternalLink className="w-4 h-4" />
+                                    Track Order (Customer View)
+                                </a>
+                            )}
                         </div>
 
                         {/* Delivery Status */}

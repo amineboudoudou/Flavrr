@@ -88,6 +88,7 @@ serve(async (req) => {
                 id,
                 org_id,
                 order_number,
+                public_token,
                 status,
                 fulfillment_type,
                 customer_name,
@@ -103,6 +104,7 @@ serve(async (req) => {
                 created_at,
                 paid_at,
                 accepted_at,
+                ready_at,
                 completed_at
             `)
             .eq('id', orderId)
