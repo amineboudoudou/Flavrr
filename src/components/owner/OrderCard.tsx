@@ -98,22 +98,37 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
             {/* Items Preview */}
             <p className="text-muted text-xs mb-3 line-clamp-2">{itemsPreview}</p>
 
-            {/* Total */}
+            {/* Total & Actions */}
             <div className="flex items-center justify-between pt-3 border-t border-border">
                 <span className="text-text font-bold text-lg">${(order.total || 0).toFixed(2)}</span>
 
-                {/* Quick Action Button */}
-                {onQuickAction && quickActionLabel && !isSelecting && (
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onQuickAction();
-                        }}
-                        className="bg-primary hover:bg-accent text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
-                    >
-                        {quickActionLabel}
-                    </button>
-                )}
+                <div className="flex items-center gap-2">
+                    {/* Track Button */}
+                    {order.public_token && !isSelecting && (
+                        <a
+                            href={`/t/${order.public_token}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                        >
+                            Track
+                        </a>
+                    )}
+
+                    {/* Quick Action Button */}
+                    {onQuickAction && quickActionLabel && !isSelecting && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onQuickAction();
+                            }}
+                            className="bg-primary hover:bg-accent text-white text-xs font-semibold px-4 py-2 rounded-lg transition-colors"
+                        >
+                            {quickActionLabel}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* "New" Indicator */}

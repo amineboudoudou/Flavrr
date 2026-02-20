@@ -648,13 +648,47 @@ export const CheckoutFlow: React.FC<Props> = ({ lang, isOpen, onClose, items, ca
                                 <p className="text-white font-mono text-lg text-pink-500">#{orderNumber || orderToken || 'Processing...'}</p>
                             </div>
 
-                            {fulfillmentType === 'delivery' && (
-                                <a
-                                    href={`/order/${orderToken}`}
-                                    className="block max-w-sm mx-auto w-full px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-bold uppercase tracking-widest rounded-xl transition-all border border-white/10"
-                                >
-                                    📍 {lang === 'fr' ? 'Suivre la livraison' : 'Track Delivery'}
-                                </a>
+                            {/* Track Order Button - for all orders */}
+                            <a
+                                href={`/t/${orderToken}`}
+                                className="block max-w-sm mx-auto w-full px-6 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-blue-600/20"
+                            >
+                                📍 {lang === 'fr' ? 'Suivre ma commande' : 'Track My Order'}
+                            </a>
+
+                            {/* Pickup Address with Maps Link - for pickup orders */}
+                            {fulfillmentType === 'pickup' && organization && (
+                                <div className="max-w-sm mx-auto">
+                                    <a
+                                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${organization.name} ${organization.street} ${organization.city} ${organization.postal_code}`)}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block w-full p-6 bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl transition-all text-left"
+                                    >
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-12 h-12 bg-pink-600/20 rounded-full flex items-center justify-center shrink-0">
+                                                <MapPin className="w-6 h-6 text-pink-500" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="text-white/60 text-xs uppercase tracking-wider mb-1">
+                                                    {lang === 'fr' ? 'Adresse de retrait' : 'Pickup Location'}
+                                                </p>
+                                                <p className="text-white font-medium">
+                                                    {organization.name}
+                                                </p>
+                                                <p className="text-white/70 text-sm">
+                                                    {organization.street}<br />
+                                                    {organization.city}, {organization.postal_code}
+                                                </p>
+                                                <p className="text-pink-400 text-xs mt-3 flex items-center gap-1">
+                                                    <span>🗺️</span>
+                                                    {lang === 'fr' ? 'Ouvrir dans Google Maps' : 'Open in Google Maps'}
+                                                    <span>→</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </a>
+                                </div>
                             )}
 
                             <button

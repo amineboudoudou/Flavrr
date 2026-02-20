@@ -83,11 +83,11 @@ serve(async (req) => {
             }
         }
 
-        // Safety guard for local/test
-        const uberEnv = Deno.env.get('UBER_ENV')
-        if (uberEnv !== 'test') {
-            throw new Error('Safety Guard: UBER_ENV is not set to "test". Delivery creation blocked.')
-        }
+        // Check Uber environment (allow both test and production)
+        const uberEnv = Deno.env.get('UBER_ENV') || 'production'
+        const isTestMode = uberEnv === 'test'
+        
+        console.log(`🚚 Uber Delivery Mode: ${uberEnv}`)
 
         // IDEMPOTENCY: one delivery per order
         const { data: existingDelivery } = await supabaseAdmin
@@ -151,19 +151,31 @@ serve(async (req) => {
 
         const accessToken = await getUberAccessToken()
 
-        const pickupAddressText = Deno.env.get('UBER_TEST_PICKUP_ADDRESS') || '123 Test St, Montreal, QC, CA'
-        const pickupPhone = Deno.env.get('UBER_TEST_PICKUP_PHONE') || '+15145550000'
+        // Fetch organization details for pickup address
+        const { data: org, error: orgError } = await supabaseAdmin
+            .from('organizations')
+            .select('name, street, city, region, postal_code, country, phone')
+            .eq('id', order.workspace_id)
+            .single()
+        
+        if (orgError || !org) {
+            throw new Error('Organization not found for pickup address')
+        }
+
+        // Use real organization address for pickup
+        const pickupAddressText = `${org.street}, ${org.city}, ${org.region} ${org.postal_code}, ${org.country || 'CA'}`
+        const pickupPhone = org.phone || '+15145550000'
 
         const dropoff = order.delivery_address as any
-        const dropoffAddressText = dropoff?.address || pickupAddressText
+        const dropoffAddressText = dropoff?.address || `${dropoff?.street}, ${dropoff?.city}, ${dropoff?.region} ${dropoff?.postal_code}`
 
-        const deliveryRequest = {
+        const deliveryRequest: any = {
             pickup: {
                 location: {
                     address: pickupAddressText,
                 },
                 contact: {
-                    company_name: 'Flavrr',
+                    company_name: org.name,
                     phone_number: pickupPhone,
                 },
             },
@@ -173,14 +185,23 @@ serve(async (req) => {
                     ...(dropoff?.lat && dropoff?.lng ? { latitude: dropoff.lat, longitude: dropoff.lng } : {}),
                 },
                 contact: {
-                    first_name: 'Customer',
-                    phone_number: pickupPhone,
+                    first_name: order.customer_name?.split(' ')[0] || 'Customer',
+                    phone_number: order.customer_phone || pickupPhone,
                 },
-                instructions: null,
+                instructions: dropoff?.instructions || '',
             },
             manifest: {
-                description: `Order ${order_id}`,
+                description: `Order #${order_id}`,
             },
+        }
+        
+        // Add test specifications only in test mode
+        if (isTestMode) {
+            deliveryRequest.test_specifications = {
+                robo_courier_specification: {
+                    mode: "auto"
+                }
+            }
         }
 
         const response = await fetch(`${UBER_API_BASE}/${UBER_CUSTOMER_ID}/deliveries`, {
