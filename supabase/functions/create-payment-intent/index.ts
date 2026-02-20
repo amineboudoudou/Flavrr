@@ -316,9 +316,11 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Order not found', requestId }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Verify order is in correct state
-    if (order.status !== 'draft' && order.status !== 'pending_payment') {
-      return new Response(JSON.stringify({ error: 'Order cannot be paid in current status', requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Verify order is in correct state - more permissive for retry scenarios
+    const validPaymentStatuses = ['draft', 'pending_payment', 'awaiting_payment', 'unpaid'];
+    if (!validPaymentStatuses.includes(order.status)) {
+      console.error('Order status check failed:', { order_id: orderId, current_status: order.status, valid_statuses: validPaymentStatuses });
+      return new Response(JSON.stringify({ error: `Order cannot be paid in current status: ${order.status}`, requestId }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // Check if payment already exists

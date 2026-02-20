@@ -10,7 +10,8 @@ import { useSound } from '../../hooks/useSound';
 import { useOrderRealtime } from '../../hooks/useOrderRealtime';
 import type { Order, OrderStatus } from '../../types';
 import { api } from '../../lib/api';
-import { Trash2, X, CheckSquare, Square } from 'lucide-react';
+import { CreateManualOrderModal } from '../../components/owner/CreateManualOrderModal';
+import { Trash2, X, CheckSquare, Square, Plus } from 'lucide-react';
 
 type ViewMode = 'board' | 'list';
 type DateFilter = 'today' | '7d' | '30d' | 'all';
@@ -30,7 +31,31 @@ export const OrdersBoard: React.FC = () => {
     const [deleting, setDeleting] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+    const [showCreateModal, setShowCreateModal] = useState(false);
+
     const isSelecting = selectedIds.size > 0;
+
+    // Define fetchOrders at component level so it can be called from callbacks
+    const fetchOrders = useCallback(async () => {
+        if (!profile?.org_id) return;
+        
+        try {
+            setLoading(true);
+            setError(null);
+            const response = await api.listOrders({
+                orgId: profile.org_id,
+                statuses: ['paid', 'accepted', 'preparing', 'ready', 'completed'],
+                limit: 100,
+            });
+            setOrders(response.orders);
+        } catch (err: any) {
+            if (err?.name === 'AbortError') return;
+            console.error('Orders fetch failed:', err);
+            setError(err.message || 'Failed to load orders');
+        } finally {
+            setLoading(false);
+        }
+    }, [profile?.org_id]);
 
     // Sound notification hook
     const { play: playNotification } = useSound('/notification.mp3', { autoUnlock: true });
@@ -105,28 +130,10 @@ export const OrdersBoard: React.FC = () => {
             return () => { clearTimeout(timeoutId); isMounted = false; };
         }
 
-        const fetchOrders = async () => {
-            try {
-                setLoading(true);
-                setError(null);
-                const response = await api.listOrders({
-                    orgId: profile.org_id,
-                    statuses: ['paid', 'accepted', 'preparing', 'ready', 'completed'],
-                    limit: 100,
-                });
-                if (isMounted) setOrders(response.orders);
-            } catch (err: any) {
-                if (err?.name === 'AbortError') return;
-                console.error('Orders fetch failed:', err);
-                if (isMounted) setError(err.message || 'Failed to load orders');
-            } finally {
-                if (isMounted) setLoading(false);
-            }
-        };
-
+        // Use component-level fetchOrders
         fetchOrders();
         return () => { isMounted = false; if (timeoutId) clearTimeout(timeoutId); };
-    }, [profile?.org_id, session, navigate]);
+    }, [profile?.org_id, session, navigate, fetchOrders]);
 
     // Handle quick actions
     const handleQuickAction = useCallback(async (order: Order, nextStatus: OrderStatus) => {
@@ -266,13 +273,22 @@ export const OrdersBoard: React.FC = () => {
                                 </button>
                             </div>
                         ) : (
-                            <button
-                                onClick={() => selectAll()}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-text bg-surface-2 border border-border rounded-xl transition-colors"
-                            >
-                                <Square className="w-3.5 h-3.5" />
-                                Select
-                            </button>
+                            <>
+                                <button
+                                    onClick={() => selectAll()}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted hover:text-text bg-surface-2 border border-border rounded-xl transition-colors"
+                                >
+                                    <Square className="w-3.5 h-3.5" />
+                                    Select
+                                </button>
+                                <button
+                                    onClick={() => setShowCreateModal(true)}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-pink-500 hover:bg-pink-600 rounded-xl transition-colors"
+                                >
+                                    <Plus className="w-3.5 h-3.5" />
+                                    Create Order
+                                </button>
+                            </>
                         )}
                     </div>
                 </div>
@@ -353,6 +369,16 @@ export const OrdersBoard: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            <CreateManualOrderModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onOrderCreated={(order) => {
+                    setToastMessage(`Order #${order.order_number} created!`);
+                    // Refresh orders list
+                    fetchOrders();
+                }}
+            />
 
             {toastMessage && (
                 <Toast message={toastMessage} onClose={() => setToastMessage(null)} />
