@@ -3,11 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, X } from 'lucide-react';
 import { OwnerLayout } from '../../components/owner/OwnerLayout';
 import { BrandedLoader } from '../../components/owner/BrandedLoader';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { api } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import type { Customer } from '../../types';
 
 export const Customers: React.FC = () => {
+    const { activeWorkspace } = useWorkspace();
     const [customers, setCustomers] = useState<Customer[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
@@ -200,6 +202,7 @@ export const Customers: React.FC = () => {
                                 fetchCustomers();
                                 setShowCreateModal(false);
                             }}
+                            workspaceId={activeWorkspace?.id || ''}
                         />
                     </div>
                 )}
@@ -209,7 +212,7 @@ export const Customers: React.FC = () => {
 };
 
 // Create Customer Modal Component
-const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: () => void }> = ({ onClose, onCustomerCreated }) => {
+const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: () => void; workspaceId: string }> = ({ onClose, onCustomerCreated, workspaceId }) => {
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
@@ -222,24 +225,12 @@ const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: ()
 
         setLoading(true);
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (!session) throw new Error('Not authenticated');
-
-            const { data: { user } } = await supabase.auth.getUser();
-            
-            // Get workspace
-            const { data: membership } = await supabase
-                .from('workspace_memberships')
-                .select('workspace_id')
-                .eq('user_id', user?.id)
-                .single();
-
-            if (!membership) throw new Error('No workspace found');
+            if (!workspaceId) throw new Error('No workspace found');
 
             const { error } = await supabase
                 .from('customers')
                 .insert({
-                    workspace_id: membership.workspace_id,
+                    workspace_id: workspaceId,
                     name: name.trim(),
                     email: email.trim() || null,
                     phone: phone.trim() || null,

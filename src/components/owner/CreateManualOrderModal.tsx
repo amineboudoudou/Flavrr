@@ -69,14 +69,33 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
   }, [isOpen, activeWorkspace]);
 
   const fetchProducts = async () => {
-    const { data } = await supabase
-      .from('products')
-      .select('id, name, base_price_cents, description')
-      .eq('workspace_id', activeWorkspace?.id)
-      .eq('is_active', true)
-      .order('name');
+    if (!activeWorkspace?.id) {
+      console.error('No active workspace for fetching products');
+      return;
+    }
     
-    if (data) setProducts(data);
+    try {
+      console.log('Fetching products for workspace:', activeWorkspace.id);
+      
+      const { data, error } = await supabase
+        .from('products')
+        .select('id, name, base_price_cents, description, is_active')
+        .eq('workspace_id', activeWorkspace.id)
+        .order('name');
+      
+      if (error) {
+        console.error('Error fetching products:', error);
+        return;
+      }
+      
+      console.log('Fetched products:', data?.length || 0, data);
+      
+      // Filter active products only
+      const activeProducts = data?.filter(p => p.is_active !== false) || [];
+      setProducts(activeProducts);
+    } catch (err) {
+      console.error('Exception fetching products:', err);
+    }
   };
 
   const fetchCustomers = async () => {
