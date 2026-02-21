@@ -265,8 +265,16 @@ export async function updateOrderStatus(
         }
 
         const data = await response.json();
-        const order = data?.order ?? data;
-        return transformOrder(order);
+        
+        // Edge function returns partial order, fetch full order to prevent UI disappearing
+        // The partial order lacks items, totals, and other fields OrdersBoard needs
+        try {
+            return await getOrder(orderId);
+        } catch (fetchErr) {
+            // Fallback to partial order if fetch fails, though this may cause UI issues
+            const order = data?.order ?? data;
+            return transformOrder(order);
+        }
     } catch (error: any) {
         clearTimeout(timeoutId);
         if (error instanceof ApiError) throw error;
