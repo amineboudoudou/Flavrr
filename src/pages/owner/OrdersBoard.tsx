@@ -139,7 +139,8 @@ export const OrdersBoard: React.FC = () => {
     const handleQuickAction = useCallback(async (order: Order, nextStatus: OrderStatus) => {
         try {
             const updatedOrder = await api.updateOrderStatus(order.id, nextStatus);
-            setOrders(prev => prev.map(o => o.id === order.id ? updatedOrder : o));
+            // Merge with existing order to prevent disappearance when partial order returned
+            setOrders(prev => prev.map(o => o.id === order.id ? { ...o, ...updatedOrder, status: nextStatus } : o));
             setToastMessage(`Order #${order.order_number} → ${nextStatus}`);
         } catch (err: any) {
             setToastMessage(`Error: ${err.message}`);
