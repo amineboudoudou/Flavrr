@@ -100,14 +100,27 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
   };
 
   const fetchCustomers = async () => {
-    const { data } = await supabase
-      .from('customers')
-      .select('id, name, email, phone, address')
-      .eq('workspace_id', activeWorkspace?.id)
-      .order('name')
-      .limit(50);
-    
-    if (data) setCustomers(data);
+    try {
+      const res = await api.listCustomers({ limit: 50, sort: 'last_order_at' });
+      const mapped: Customer[] = (res.customers || []).map((c: any) => {
+        const displayName =
+          (c.first_name || c.last_name)
+            ? `${c.first_name || ''} ${c.last_name || ''}`.trim()
+            : (c.email || 'Unknown');
+
+        return {
+          id: c.id,
+          name: displayName,
+          email: c.email || undefined,
+          phone: c.phone || undefined,
+          address: c.default_address || {},
+        };
+      });
+      setCustomers(mapped);
+    } catch (err) {
+      console.error('Failed to fetch customers:', err);
+      setCustomers([]);
+    }
   };
 
   const addItem = (product: Product) => {

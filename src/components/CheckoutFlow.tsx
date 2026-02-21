@@ -41,6 +41,7 @@ const PaymentForm = ({
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isPaymentElementReady, setIsPaymentElementReady] = useState(false);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -49,10 +50,25 @@ const PaymentForm = ({
             return;
         }
 
+        const paymentElement = elements.getElement(PaymentElement);
+        if (!paymentElement || !isPaymentElementReady) {
+            const msg = 'Payment form is still loading. Please wait a moment and try again.';
+            setErrorMessage(msg);
+            onError(msg);
+            return;
+        }
+
         setIsProcessing(true);
         setErrorMessage(null);
 
         try {
+            const submitResult = await elements.submit();
+            if (submitResult?.error) {
+                setErrorMessage(submitResult.error.message || 'Payment failed');
+                onError(submitResult.error.message || 'Payment failed');
+                return;
+            }
+
             const { error, paymentIntent } = await stripe.confirmPayment({
                 elements,
                 redirect: 'if_required', // Avoid redirect if possible
@@ -86,6 +102,7 @@ const PaymentForm = ({
                         layout: 'tabs',
                         paymentMethodOrder: ['card', 'apple_pay', 'google_pay'],
                     }}
+                    onReady={() => setIsPaymentElementReady(true)}
                 />
             </div>
 
@@ -97,7 +114,7 @@ const PaymentForm = ({
 
             <button
                 type="submit"
-                disabled={!stripe || isProcessing}
+                disabled={!stripe || !elements || !isPaymentElementReady || isProcessing}
                 className="w-full group flex items-center justify-center gap-4 px-10 py-4 bg-pink-600 text-white font-black uppercase tracking-widest rounded-2xl hover:bg-pink-500 transition-all shadow-2xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
                 {isProcessing ? 'Processing...' : (lang === 'fr' ? `Payer $${total.toFixed(2)}` : `Pay $${total.toFixed(2)}`)}

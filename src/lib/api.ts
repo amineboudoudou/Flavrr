@@ -64,7 +64,16 @@ async function fetchWithAuth<T>(
     endpoint: string,
     options: { method?: string; body?: any; query?: Record<string, string> } = {}
 ): Promise<T> {
-    const { data: { session } } = await supabase.auth.getSession();
+    let { data: { session } } = await supabase.auth.getSession();
+
+    // Proactively refresh sessions that are expired or about to expire.
+    // This avoids edge functions returning "Invalid JWT" for time-skew / stale tokens.
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const refreshSkewSeconds = 60;
+    if (session?.expires_at && session.expires_at <= nowSeconds + refreshSkewSeconds) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session ?? null;
+    }
 
     if (!session) {
         throw new ApiError('No active session', 'UNAUTHORIZED', 401);

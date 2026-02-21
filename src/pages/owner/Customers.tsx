@@ -218,34 +218,62 @@ const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: ()
     const [phone, setPhone] = useState('');
     const [address, setAddress] = useState({ street: '', city: '', region: '', postal_code: '', country: 'CA' });
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
 
         setLoading(true);
+        setErrorMessage(null);
         try {
-            if (!workspaceId) throw new Error('No workspace found');
+            const { data: authData, error: authError } = await supabase.auth.getUser();
+            if (authError) throw authError;
+            if (!authData.user) throw new Error('Not authenticated');
 
-            const { error } = await supabase
-                .from('customers')
-                .insert({
-                    workspace_id: workspaceId,
-                    name: name.trim(),
-                    email: email.trim() || null,
-                    phone: phone.trim() || null,
-                    address: address.street ? JSON.stringify(address) : null,
-                    first_order_at: new Date().toISOString(),
-                    last_order_at: new Date().toISOString(),
-                    total_orders: 0,
-                    total_spent_cents: 0,
-                });
+            const { data: profile, error: profileError } = await supabase
+                .from('profiles')
+                .select('org_id')
+                .eq('user_id', authData.user.id)
+                .single();
 
+            if (profileError) throw profileError;
+            if (!profile?.org_id) throw new Error('No organization found');
+
+            const trimmedName = name.trim();
+            const parts = trimmedName.split(/\s+/).filter(Boolean);
+            const first_name = parts[0] || null;
+            const last_name = parts.length > 1 ? parts.slice(1).join(' ') : null;
+
+            const normalizedEmail = email.trim() ? email.trim().toLowerCase() : null;
+            const payload: any = {
+                org_id: profile.org_id,
+                first_name,
+                last_name,
+                email: normalizedEmail,
+                phone: phone.trim() || null,
+                default_address: address.street
+                    ? {
+                        street: address.street,
+                        city: address.city,
+                        region: address.region,
+                        postal_code: address.postal_code,
+                        country: address.country,
+                    }
+                    : {},
+                source: 'manual',
+            };
+
+            const query = normalizedEmail
+                ? supabase.from('customers').upsert(payload, { onConflict: 'org_id,email' })
+                : supabase.from('customers').insert(payload);
+
+            const { error } = await query;
             if (error) throw error;
             
             onCustomerCreated();
         } catch (error: any) {
-            alert('Error creating customer: ' + error.message);
+            setErrorMessage(error.message || 'Failed to create customer');
         } finally {
             setLoading(false);
         }
@@ -261,6 +289,11 @@ const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: ()
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errorMessage && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                        {errorMessage}
+                    </div>
+                )}
                 <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Name *</label>
                     <input
