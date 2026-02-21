@@ -39,15 +39,10 @@ serve(async (req) => {
             })
         }
 
-        console.log('🔍 UBER CREATE DELIVERY STARTED', { order_id, hasServiceRole: !!serviceRoleHeader })
-
-        const supabaseAdmin = createClient(
-            Deno.env.get('SUPABASE_URL') ?? '',
-            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-        )
-
         const { order_id, quote_id } = await req.json()
         if (!order_id) throw new Error('Missing order_id')
+
+        console.log('🔍 UBER CREATE DELIVERY STARTED', { order_id, hasServiceRole: !!serviceRoleHeader })
 
         // Fetch order (workspace-scoped)
         const { data: order, error: orderError } = await supabaseAdmin
