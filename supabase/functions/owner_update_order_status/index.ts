@@ -79,9 +79,10 @@ serve(async (req) => {
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         )
 
+        // SELECT with uber_delivery_id for idempotency check
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, org_id, status, customer_email, customer_name, fulfillment_type, public_token, order_number')
+            .select('id, org_id, status, customer_email, customer_name, fulfillment_type, public_token, order_number, uber_delivery_id, uber_tracking_url, delivery_address')
             .eq('id', order_id)
             .single()
 
@@ -91,6 +92,14 @@ serve(async (req) => {
                 { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
             )
         }
+
+        console.log('📦 ORDER STATUS UPDATE TRIGGERED', {
+            order_id: order.id,
+            new_status,
+            current_status: order.status,
+            fulfillment_type: order.fulfillment_type,
+            existing_delivery_id: order.uber_delivery_id,
+        })
 
         if (order.org_id !== profile.org_id) {
             return new Response(
@@ -178,35 +187,119 @@ serve(async (req) => {
             }
         }
 
-        // For delivery orders: trigger Uber delivery creation
-        if (new_status === 'ready' && order.fulfillment_type === 'delivery') {
-            console.log('🚚 Delivery order marked ready - triggering Uber delivery creation for order:', order_id)
-            
-            // Call uber_create_delivery via internal API
-            const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-            const functionsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/uber_create_delivery`
-            
-            fetch(functionsUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + serviceRoleKey,
-                    'X-Service-Role-Key': serviceRoleKey || '',
-                },
-                body: JSON.stringify({ order_id }),
-            }).then(async (response) => {
-                if (response.ok) {
-                    const result = await response.json()
-                    console.log('✅ Uber delivery created:', result.delivery_id || result.uber_delivery_id)
-                } else {
-                    const error = await response.text()
-                    console.error('❌ Failed to create Uber delivery:', error)
-                    // TODO: Notify owner of failure via notification/email
+        const fulfillment = (order.fulfillment_type || '').toLowerCase()
+
+        console.log('🚚 DELIVERY CHECK', {
+            new_status,
+            fulfillment,
+            is_delivery: fulfillment === 'delivery',
+            has_existing_delivery: !!order.uber_delivery_id,
+        })
+
+        // For delivery orders marked ready: trigger Uber delivery creation with strict checks
+        if (new_status === 'ready' && fulfillment === 'delivery') {
+            // IDEMPOTENCY: Skip if delivery already exists
+            if (order.uber_delivery_id) {
+                console.log('⏭️ Delivery already exists, skipping Uber creation', {
+                    order_id,
+                    uber_delivery_id: order.uber_delivery_id,
+                })
+            } else {
+                console.log('🚚 Creating Uber delivery for order:', order_id)
+                
+                // Call uber_create_delivery via internal API
+                const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+                const functionsUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/uber_create_delivery`
+                
+                try {
+                    const uberResponse = await fetch(functionsUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + serviceRoleKey,
+                            'X-Service-Role-Key': serviceRoleKey || '',
+                        },
+                        body: JSON.stringify({ order_id }),
+                    })
+
+                    console.log('📡 UBER RESPONSE STATUS', uberResponse.status)
+
+                    if (uberResponse.ok) {
+                        const result = await uberResponse.json()
+                        console.log('✅ UBER DELIVERY CREATED', {
+                            delivery_id: result.delivery_id,
+                            uber_delivery_id: result.uber_delivery_id,
+                            tracking_url: result.tracking_url,
+                        })
+
+                        // Update order with delivery info
+                        const { error: deliveryUpdateError } = await supabaseAdmin
+                            .from('orders')
+                            .update({
+                                uber_delivery_id: result.uber_delivery_id,
+                                uber_tracking_url: result.tracking_url,
+                                delivery_status: 'pending',
+                            })
+                            .eq('id', order_id)
+
+                        if (deliveryUpdateError) {
+                            console.error('❌ Failed to save delivery info to order:', deliveryUpdateError)
+                        }
+                    } else {
+                        const errorText = await uberResponse.text()
+                        console.error('❌ UBER DELIVERY FAILED', {
+                            status: uberResponse.status,
+                            error: errorText,
+                        })
+
+                        // Update order with delivery error but keep status as ready
+                        await supabaseAdmin
+                            .from('orders')
+                            .update({
+                                delivery_error: `Failed to create delivery: ${errorText}`,
+                            })
+                            .eq('id', order_id)
+
+                        // Return success but with warning - order is ready but delivery failed
+                        return new Response(
+                            JSON.stringify({
+                                success: true,
+                                order: updatedOrder,
+                                warning: 'Order marked ready but delivery creation failed. Please check delivery settings and try again.',
+                                delivery_error: errorText,
+                            }),
+                            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                        )
+                    }
+                } catch (err: any) {
+                    console.error('❌ EXCEPTION CALLING UBER:', err.message)
+                    
+                    // Save error to order
+                    await supabaseAdmin
+                        .from('orders')
+                        .update({
+                            delivery_error: `Exception: ${err.message}`,
+                        })
+                        .eq('id', order_id)
+
+                    return new Response(
+                        JSON.stringify({
+                            success: true,
+                            order: updatedOrder,
+                            warning: 'Order marked ready but delivery creation failed.',
+                            delivery_error: err.message,
+                        }),
+                        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+                    )
                 }
-            }).catch((err) => {
-                console.error('❌ Error calling uber_create_delivery:', err)
-            })
+            }
         }
+
+        console.log('✅ ORDER UPDATE COMPLETE', {
+            order_id,
+            status: new_status,
+            has_delivery: !!order.uber_delivery_id,
+        })
 
         return new Response(
             JSON.stringify({ success: true, order: updatedOrder }),
