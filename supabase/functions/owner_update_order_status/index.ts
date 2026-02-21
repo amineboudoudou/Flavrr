@@ -14,7 +14,7 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
     'accepted': ['preparing', 'canceled'],
     'incoming': ['accepted', 'preparing', 'canceled'],
     'preparing': ['ready', 'canceled'],
-    'ready': ['completed', 'out_for_delivery', 'canceled'],
+    'ready': ['completed', 'out_for_delivery', 'canceled', 'preparing'],
     'out_for_delivery': ['completed', 'canceled'],
     'completed': [],
     'canceled': [],
