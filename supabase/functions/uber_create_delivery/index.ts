@@ -39,6 +39,8 @@ serve(async (req) => {
             })
         }
 
+        console.log('🔍 UBER CREATE DELIVERY STARTED', { order_id, hasServiceRole: !!serviceRoleHeader })
+
         const supabaseAdmin = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -50,9 +52,11 @@ serve(async (req) => {
         // Fetch order (workspace-scoped)
         const { data: order, error: orderError } = await supabaseAdmin
             .from('orders')
-            .select('id, workspace_id, status, delivery_address, delivery_fee_cents')
+            .select('id, workspace_id, org_id, status, delivery_address, delivery_fee_cents')
             .eq('id', order_id)
             .single()
+
+        console.log('📦 Order fetched:', { order_id: order?.id, org_id: order?.org_id, has_delivery_address: !!order?.delivery_address })
 
         if (orderError || !order) throw new Error('Order not found')
 
@@ -89,6 +93,8 @@ serve(async (req) => {
         
         console.log(`🚚 Uber Delivery Mode: ${uberEnv}`)
 
+        console.log('🔍 Checking existing delivery...')
+
         // IDEMPOTENCY: one delivery per order
         const { data: existingDelivery } = await supabaseAdmin
             .from('deliveries')
@@ -108,6 +114,8 @@ serve(async (req) => {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             })
         }
+
+        console.log('📝 Reserving delivery row...')
 
         // Reserve delivery row first (DB-level idempotency_key)
         const { data: reservedDelivery, error: reserveError } = await supabaseAdmin
@@ -149,15 +157,21 @@ serve(async (req) => {
             throw new Error('Failed to reserve delivery')
         }
 
+        console.log('✅ Delivery row reserved:', reservedDelivery?.id)
+
         const accessToken = await getUberAccessToken()
 
-        // Fetch organization details for pickup address
+        console.log('🔑 Got Uber access token')
+
+        // Fetch organization details for pickup address using org_id
         const { data: org, error: orgError } = await supabaseAdmin
             .from('organizations')
             .select('name, street, city, region, postal_code, country, phone')
-            .eq('id', order.workspace_id)
+            .eq('id', order.org_id)
             .single()
         
+        console.log('🏢 Organization found:', { name: org?.name, has_address: !!(org?.street && org?.city) })
+
         if (orgError || !org) {
             throw new Error('Organization not found for pickup address')
         }
@@ -168,6 +182,8 @@ serve(async (req) => {
 
         const dropoff = order.delivery_address as any
         const dropoffAddressText = dropoff?.address || `${dropoff?.street}, ${dropoff?.city}, ${dropoff?.region} ${dropoff?.postal_code}`
+
+        console.log('📍 Building delivery request:', { pickup: pickupAddressText, dropoff: dropoffAddressText })
 
         const deliveryRequest: any = {
             pickup: {
@@ -204,6 +220,8 @@ serve(async (req) => {
             }
         }
 
+        console.log('🚀 Calling Uber API...')
+
         const response = await fetch(`${UBER_API_BASE}/${UBER_CUSTOMER_ID}/deliveries`, {
             method: 'POST',
             headers: {
@@ -216,7 +234,7 @@ serve(async (req) => {
 
         if (!response.ok) {
             const err = await response.json().catch(() => ({}))
-            console.error('❌ Uber Create Delivery Error:', JSON.stringify(err))
+        console.log('❌ Uber API Error:', response.status, JSON.stringify(err))
 
             await supabaseAdmin
                 .from('deliveries')
@@ -253,9 +271,9 @@ serve(async (req) => {
         })
 
     } catch (error) {
-        console.error('🚨 Handler Error:', error)
+        console.error('🚨 Handler Error:', error.message, error.stack)
         return new Response(
-            JSON.stringify({ error: error.message }),
+            JSON.stringify({ error: error.message, stack: error.stack }),
             { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
     }
