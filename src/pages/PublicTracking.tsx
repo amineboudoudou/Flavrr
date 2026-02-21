@@ -28,10 +28,13 @@ export const PublicTracking: React.FC = () => {
 
     const fetchOrder = async () => {
       try {
+        setError(null);
         const { data, error } = await supabase
           .from('orders')
           .select('id, order_number, status, fulfillment_type, created_at, ready_at, completed_at, uber_tracking_url, uber_status, total_cents, customer_name')
           .eq('public_token', token)
+          .order('created_at', { ascending: false })
+          .limit(1)
           .single();
 
         if (error) throw error;
@@ -46,7 +49,7 @@ export const PublicTracking: React.FC = () => {
 
         setOrder({ ...data, items: items || [] });
       } catch (err: any) {
-        setError(err.message || 'Order not found');
+        setError(err?.message || 'Order not found');
       } finally {
         setLoading(false);
       }

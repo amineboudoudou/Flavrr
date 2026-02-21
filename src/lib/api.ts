@@ -217,7 +217,15 @@ export async function updateOrderStatus(
     status: OrderStatus
 ): Promise<Order> {
     // Special fetch for order status that doesn't redirect on 401
-    const { data: { session } } = await supabase.auth.getSession();
+    let { data: { session } } = await supabase.auth.getSession();
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const refreshSkewSeconds = 60;
+    if (session?.expires_at && session.expires_at <= nowSeconds + refreshSkewSeconds) {
+        const refreshed = await supabase.auth.refreshSession();
+        session = refreshed.data.session ?? null;
+    }
+
     if (!session) {
         throw new ApiError('No active session', 'UNAUTHORIZED', 401);
     }
@@ -257,7 +265,8 @@ export async function updateOrderStatus(
         }
 
         const data = await response.json();
-        return data.order;
+        const order = data?.order ?? data;
+        return transformOrder(order);
     } catch (error: any) {
         clearTimeout(timeoutId);
         if (error instanceof ApiError) throw error;
