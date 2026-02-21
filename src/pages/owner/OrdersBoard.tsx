@@ -327,6 +327,8 @@ export const OrdersBoard: React.FC = () => {
                         onOrderClick={handleOrderClick}
                         onQuickAction={(order) => handleQuickAction(order, 'completed')}
                         quickActionLabel="Complete"
+                        onRevertAction={(order) => handleQuickAction(order, 'preparing')}
+                        revertActionLabel="↩️ Back to Prep"
                         selectedIds={selectedIds}
                         onToggleSelect={toggleSelect}
                         isSelecting={isSelecting}

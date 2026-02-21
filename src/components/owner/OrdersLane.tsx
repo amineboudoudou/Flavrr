@@ -9,6 +9,8 @@ interface OrdersLaneProps {
     onOrderClick: (order: Order) => void;
     onQuickAction?: (order: Order) => void;
     quickActionLabel?: string;
+    onRevertAction?: (order: Order) => void;
+    revertActionLabel?: string;
     selectedIds?: Set<string>;
     onToggleSelect?: (id: string) => void;
     isSelecting?: boolean;
@@ -21,6 +23,8 @@ export const OrdersLane: React.FC<OrdersLaneProps> = ({
     onOrderClick,
     onQuickAction,
     quickActionLabel,
+    onRevertAction,
+    revertActionLabel,
     selectedIds,
     onToggleSelect,
     isSelecting,
@@ -49,6 +53,8 @@ export const OrdersLane: React.FC<OrdersLaneProps> = ({
                             onClick={() => onOrderClick(order)}
                             onQuickAction={onQuickAction ? () => onQuickAction(order) : undefined}
                             quickActionLabel={quickActionLabel}
+                            onRevertAction={onRevertAction ? () => onRevertAction(order) : undefined}
+                            revertActionLabel={revertActionLabel}
                             isSelected={selectedIds?.has(order.id) || false}
                             onToggleSelect={onToggleSelect ? () => onToggleSelect(order.id) : undefined}
                             isSelecting={isSelecting || false}

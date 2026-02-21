@@ -1,7 +1,35 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const webhookSecret = Deno.env.get('UBER_DIRECT_WEBHOOK_SECRET') ?? ''
+const webhookSecret = Deno.env.get('UBER_WEBHOOK_SECRET') ?? Deno.env.get('UBER_DIRECT_WEBHOOK_SECRET') ?? ''
+
+// HMAC SHA256 verification for Uber webhook signature
+async function verifySignature(payload: string, signature: string | null, secret: string): Promise<boolean> {
+    if (!signature || !secret) return false
+    
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+    )
+    
+    const signatureData = encoder.encode(payload)
+    const computed = await crypto.subtle.sign('HMAC', key, signatureData)
+    const computedHex = Array.from(new Uint8Array(computed))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+    
+    // Timing-safe comparison
+    if (computedHex.length !== signature.length) return false
+    let result = 0
+    for (let i = 0; i < computedHex.length; i++) {
+        result |= computedHex.charCodeAt(i) ^ signature.charCodeAt(i)
+    }
+    return result === 0
+}
 
 // Map Uber status to our delivery status
 const STATUS_MAPPING: Record<string, string> = {
@@ -24,14 +52,33 @@ serve(async (req) => {
     try {
         console.log('🔔 UBER WEBHOOK RECEIVED', {
             method: req.method,
+            url: req.url,
             timestamp: new Date().toISOString(),
         })
 
-        // Verify webhook (if Uber provides signature)
+        // Get raw body for signature verification
+        const rawBody = await req.text()
+        
+        // Verify webhook signature (HMAC SHA256)
         const signature = req.headers.get('x-uber-signature')
         console.log('📝 Webhook signature:', signature || 'none')
+        console.log('🔐 Webhook secret configured:', !!webhookSecret)
+        
+        if (webhookSecret) {
+            const isValid = await verifySignature(rawBody, signature, webhookSecret)
+            if (!isValid) {
+                console.error('❌ INVALID SIGNATURE - Rejecting webhook')
+                return new Response(JSON.stringify({ error: 'Invalid signature' }), { 
+                    status: 401,
+                    headers: { 'Content-Type': 'application/json' }
+                })
+            }
+            console.log('✅ SIGNATURE VERIFIED')
+        } else {
+            console.warn('⚠️ No webhook secret configured - skipping signature verification')
+        }
 
-        const body = await req.json()
+        const body = JSON.parse(rawBody)
         console.log('📦 WEBHOOK PAYLOAD:', JSON.stringify(body, null, 2))
 
         const supabaseAdmin = createClient(

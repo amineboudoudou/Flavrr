@@ -8,12 +8,14 @@ interface OrderCardProps {
     onClick: () => void;
     onQuickAction?: () => void;
     quickActionLabel?: string;
+    onRevertAction?: () => void;
+    revertActionLabel?: string;
     isSelected?: boolean;
     onToggleSelect?: () => void;
     isSelecting?: boolean;
 }
 
-export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAction, quickActionLabel, isSelected, onToggleSelect, isSelecting }) => {
+export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAction, quickActionLabel, onRevertAction, revertActionLabel, isSelected, onToggleSelect, isSelecting }) => {
     // "New" glow if order is less than 60 seconds old
     const isNew = useMemo(() => {
         const now = new Date().getTime();
@@ -103,6 +105,19 @@ export const OrderCard = React.memo<OrderCardProps>(({ order, onClick, onQuickAc
                 <span className="text-text font-bold text-lg">${(order.total || 0).toFixed(2)}</span>
 
                 <div className="flex items-center gap-2">
+                    {/* Revert Action Button */}
+                    {onRevertAction && revertActionLabel && !isSelecting && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onRevertAction();
+                            }}
+                            className="bg-gray-500 hover:bg-gray-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition-colors"
+                        >
+                            {revertActionLabel}
+                        </button>
+                    )}
+
                     {/* Track Button */}
                     {order.public_token && !isSelecting && (
                         <a
