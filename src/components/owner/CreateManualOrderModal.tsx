@@ -1,14 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { Plus, X, Search, User, MapPin, CreditCard, Truck, Store } from 'lucide-react';
+import { Plus, X, Search, User, MapPin, CreditCard, Truck, Store, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { api } from '../../lib/api';
+import { AddressAutocomplete, type AddressComponents } from '../AddressAutocomplete';
 
 interface Product {
   id: string;
   name: string;
+  name_fr?: string;
+  name_en?: string;
   base_price_cents: number;
   description?: string;
+  description_fr?: string;
+  description_en?: string;
+  image_url?: string;
+  status: string;
+  inventory?: {
+    track_quantity: boolean;
+    available: number | null;
+    allow_overselling: boolean;
+  };
 }
 
 interface Customer {
@@ -62,6 +74,9 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'cash_on_pickup' | 'cash_on_delivery' | 'card'>('cash_on_pickup');
   const [notes, setNotes] = useState('');
 
+  const [addressVerified, setAddressVerified] = useState(false);
+  const [addressInputValue, setAddressInputValue] = useState('');
+
   useEffect(() => {
     if (isOpen && activeWorkspace) {
       fetchProducts();
@@ -76,20 +91,26 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
     }
     
     try {
-      console.log('Fetching products via API...');
+      console.log('Fetching products from unified catalog...');
       
-      // Use the same API that works in MenuManagement
-      const items = await api.ownerListMenuItems();
+      // Use the new unified products API
+      const products = await api.ownerListProducts();
       
-      console.log('Fetched menu items:', items?.length || 0, items);
+      console.log('Fetched products:', products?.length || 0, products);
       
-      // Transform menu_items to products format
-      const transformedProducts = items.map((item: any) => ({
-        id: item.id,
-        name: item.name_fr || item.name_en || item.name || 'Unnamed Product',
-        base_price_cents: item.price_cents || 0,
-        description: item.description_fr || item.description_en || item.description || '',
-        is_active: item.is_active !== false
+      // Transform products for display (use name_fr or fallback to name)
+      const transformedProducts = products.map((product: any) => ({
+        id: product.id,
+        name: product.name_fr || product.name_en || product.name || 'Unnamed Product',
+        name_fr: product.name_fr,
+        name_en: product.name_en,
+        base_price_cents: product.base_price_cents || 0,
+        description: product.description_fr || product.description_en || product.description || '',
+        description_fr: product.description_fr,
+        description_en: product.description_en,
+        image_url: product.image_url,
+        status: product.status,
+        inventory: product.inventory
       }));
       
       setProducts(transformedProducts);
@@ -271,6 +292,8 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
     setPaymentMethod('cash_on_pickup');
     setNotes('');
     setShowProductModal(false);
+    setAddressVerified(false);
+    setAddressInputValue('');
   };
 
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
@@ -504,37 +527,46 @@ export const CreateManualOrderModal: React.FC<CreateManualOrderModalProps> = ({
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="w-5 h-5" />
                     <span className="font-medium">Delivery Address</span>
+                    {addressVerified && (
+                      <span className="flex items-center gap-1 text-green-600 text-xs font-medium bg-green-50 px-2 py-1 rounded-full ml-auto">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Verified
+                      </span>
+                    )}
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Street Address *"
-                    value={deliveryAddress.street}
-                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, street: e.target.value })}
-                    className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                  />
-                  <div className="grid grid-cols-2 gap-3">
-                    <input
-                      type="text"
-                      placeholder="City *"
-                      value={deliveryAddress.city}
-                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, city: e.target.value })}
-                      className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                    />
-                    <input
-                      type="text"
-                      placeholder="Province/Region *"
-                      value={deliveryAddress.region}
-                      onChange={(e) => setDeliveryAddress({ ...deliveryAddress, region: e.target.value })}
-                      className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
+                  
+                  {/* Google Places Autocomplete */}
+                  <div className="relative">
+                    <AddressAutocomplete
+                      onAddressSelect={(address: AddressComponents) => {
+                        setDeliveryAddress({
+                          street: address.street,
+                          city: address.city,
+                          region: address.region,
+                          postal_code: address.postal_code,
+                          country: address.country,
+                          instructions: deliveryAddress.instructions,
+                        });
+                        setAddressVerified(true);
+                      }}
+                      value={addressInputValue}
+                      onValueChange={setAddressInputValue}
+                      placeholder="Start typing to search address..."
+                      restrictCountries={['ca', 'us']}
+                      className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                     />
                   </div>
-                  <input
-                    type="text"
-                    placeholder="Postal Code *"
-                    value={deliveryAddress.postal_code}
-                    onChange={(e) => setDeliveryAddress({ ...deliveryAddress, postal_code: e.target.value })}
-                    className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                  />
+                  
+                  {/* Show parsed address fields when verified */}
+                  {addressVerified && (
+                    <div className="bg-green-50 border border-green-200 rounded-xl p-4 space-y-2">
+                      <p className="text-sm text-green-800 font-medium">Verified Address:</p>
+                      <p className="text-sm text-gray-700">{deliveryAddress.street}</p>
+                      <p className="text-sm text-gray-700">{deliveryAddress.city}, {deliveryAddress.region} {deliveryAddress.postal_code}</p>
+                      <p className="text-sm text-gray-500">{deliveryAddress.country}</p>
+                    </div>
+                  )}
+                  
                   <input
                     type="text"
                     placeholder="Delivery Instructions (optional)"

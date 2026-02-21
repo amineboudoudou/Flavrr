@@ -7,6 +7,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { api } from '../../lib/api';
 import { supabase } from '../../lib/supabase';
 import type { Customer } from '../../types';
+import { AddressAutocomplete, AddressComponents } from '../../components/AddressAutocomplete';
 
 export const Customers: React.FC = () => {
     const { activeWorkspace } = useWorkspace();
@@ -216,68 +217,115 @@ const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: ()
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
-    const [address, setAddress] = useState({ street: '', city: '', region: '', postal_code: '', country: 'CA' });
+    const [addressSearchValue, setAddressSearchValue] = useState('');
+    const [addressConfirmed, setAddressConfirmed] = useState(false);
+    const [address, setAddress] = useState({
+        street: '',
+        city: '',
+        region: '',
+        postal_code: '',
+        country: 'CA',
+        lat: 0,
+        lng: 0,
+        place_id: '',
+        formatted_address: '',
+    });
     const [loading, setLoading] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+    const resetForm = () => {
+        setName('');
+        setEmail('');
+        setPhone('');
+        setAddressSearchValue('');
+        setAddressConfirmed(false);
+        setAddress({
+            street: '',
+            city: '',
+            region: '',
+            postal_code: '',
+            country: 'CA',
+            lat: 0,
+            lng: 0,
+            place_id: '',
+            formatted_address: '',
+        });
+        setErrorMessage(null);
+    };
+
+    const handleAddressSelect = (selected: AddressComponents) => {
+        setAddress({
+            street: selected.street,
+            city: selected.city,
+            region: selected.region,
+            postal_code: selected.postal_code,
+            country: selected.country,
+            lat: selected.lat,
+            lng: selected.lng,
+            place_id: selected.place_id || '',
+            formatted_address: selected.formatted_address || '',
+        });
+        setAddressSearchValue(selected.formatted_address || `${selected.street}, ${selected.city}`);
+        setAddressConfirmed(true);
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!name.trim()) return;
+        if (!workspaceId) {
+            setErrorMessage('No workspace selected. Please select a workspace and try again.');
+            return;
+        }
+        if (!addressConfirmed || !address.street || !address.city || !address.postal_code) {
+            setErrorMessage('Please select a valid address from Google suggestions.');
+            return;
+        }
 
         setLoading(true);
         setErrorMessage(null);
         try {
-            const { data: authData, error: authError } = await supabase.auth.getUser();
-            if (authError) throw authError;
-            if (!authData.user) throw new Error('Not authenticated');
-
-            const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('org_id')
-                .eq('user_id', authData.user.id)
-                .single();
-
-            if (profileError) throw profileError;
-            if (!profile?.org_id) throw new Error('No organization found');
-
             const trimmedName = name.trim();
             const parts = trimmedName.split(/\s+/).filter(Boolean);
             const first_name = parts[0] || null;
             const last_name = parts.length > 1 ? parts.slice(1).join(' ') : null;
 
             const normalizedEmail = email.trim() ? email.trim().toLowerCase() : null;
-            const payload: any = {
-                org_id: profile.org_id,
-                first_name,
-                last_name,
+            await api.ownerCreateCustomer({
+                workspace_id: workspaceId,
+                first_name: first_name || '',
+                last_name: last_name || null,
                 email: normalizedEmail,
                 phone: phone.trim() || null,
-                default_address: address.street
-                    ? {
-                        street: address.street,
-                        city: address.city,
-                        region: address.region,
-                        postal_code: address.postal_code,
-                        country: address.country,
-                    }
-                    : {},
-                source: 'manual',
-            };
-
-            const query = normalizedEmail
-                ? supabase.from('customers').upsert(payload, { onConflict: 'org_id,email' })
-                : supabase.from('customers').insert(payload);
-
-            const { error } = await query;
-            if (error) throw error;
+                default_address: {
+                    street: address.street,
+                    city: address.city,
+                    region: address.region,
+                    postal_code: address.postal_code,
+                    country: address.country,
+                    lat: address.lat,
+                    lng: address.lng,
+                    place_id: address.place_id,
+                    formatted_address: address.formatted_address,
+                },
+            });
             
             onCustomerCreated();
+            resetForm();
         } catch (error: any) {
             setErrorMessage(error.message || 'Failed to create customer');
         } finally {
             setLoading(false);
         }
     };
+
+    const canSubmit = Boolean(
+        name.trim() &&
+        addressConfirmed &&
+        address.street &&
+        address.city &&
+        address.region &&
+        address.postal_code
+    );
 
     return (
         <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
@@ -329,50 +377,43 @@ const CreateCustomerModal: React.FC<{ onClose: () => void; onCustomerCreated: ()
                 </div>
 
                 <div className="border-t pt-4 mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Address (Optional)</label>
-                    <input
-                        type="text"
-                        value={address.street}
-                        onChange={(e) => setAddress({ ...address, street: e.target.value })}
-                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 mb-2"
-                        placeholder="Street address"
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Address *</label>
+                    <AddressAutocomplete
+                        value={addressSearchValue}
+                        onValueChange={(val) => {
+                            setAddressSearchValue(val);
+                            setAddressConfirmed(false);
+                        }}
+                        onAddressSelect={handleAddressSelect}
+                        placeholder="Start typing and pick a Google-verified address"
+                        restrictCountries={['ca']}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
                     />
-                    <div className="grid grid-cols-2 gap-2">
-                        <input
-                            type="text"
-                            value={address.city}
-                            onChange={(e) => setAddress({ ...address, city: e.target.value })}
-                            className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                            placeholder="City"
-                        />
-                        <input
-                            type="text"
-                            value={address.region}
-                            onChange={(e) => setAddress({ ...address, region: e.target.value })}
-                            className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500"
-                            placeholder="Province/State"
-                        />
-                    </div>
-                    <input
-                        type="text"
-                        value={address.postal_code}
-                        onChange={(e) => setAddress({ ...address, postal_code: e.target.value })}
-                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-pink-500 mt-2"
-                        placeholder="Postal Code"
-                    />
+                    {addressConfirmed ? (
+                        <div className="mt-3 bg-pink-50 border border-pink-100 rounded-xl p-3 text-sm text-pink-900">
+                            <p className="font-medium">{address.formatted_address || address.street}</p>
+                            <p>{address.city}, {address.region} {address.postal_code}</p>
+                            <p className="text-xs text-pink-700">Lat: {address.lat.toFixed(4)} · Lng: {address.lng.toFixed(4)}</p>
+                        </div>
+                    ) : (
+                        <p className="mt-2 text-sm text-gray-500">You must select an address from the Google suggestions.</p>
+                    )}
                 </div>
 
                 <div className="flex gap-3 pt-4">
                     <button
                         type="button"
-                        onClick={onClose}
+                        onClick={() => {
+                            resetForm();
+                            onClose();
+                        }}
                         className="flex-1 py-3 border border-gray-300 rounded-xl font-medium hover:bg-gray-50"
                     >
                         Cancel
                     </button>
                     <button
                         type="submit"
-                        disabled={loading || !name.trim()}
+                        disabled={loading || !canSubmit}
                         className="flex-1 py-3 bg-pink-500 text-white rounded-xl font-medium hover:bg-pink-600 disabled:opacity-50"
                     >
                         {loading ? 'Creating...' : 'Create Customer'}

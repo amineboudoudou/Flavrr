@@ -491,6 +491,11 @@ export async function ownerListCategories(): Promise<any[]> {
         .then((res: any) => res.categories || []);
 }
 
+export async function ownerListProducts(): Promise<any[]> {
+    return fetchWithAuth('owner_list_products', { method: 'GET' })
+        .then((res: any) => res.products || []);
+}
+
 export async function ownerCreateMenuItem(data: {
     name_fr: string;
     name_en: string;
@@ -766,6 +771,7 @@ export const api = {
     // Owner Menu Management
     ownerListMenuItems,
     ownerListCategories,
+    ownerListProducts,
     ownerCreateMenuItem,
     ownerUpdateMenuItem,
     ownerDeleteMenuItem,

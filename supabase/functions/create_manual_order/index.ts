@@ -110,14 +110,28 @@ serve(async (req) => {
       );
     }
 
-    // Calculate totals
+    // Address validation for delivery
+    if (fulfillment_type === 'delivery' && delivery_address) {
+      const requiredAddressFields = ['street', 'city', 'postal_code'];
+      const missingFields = requiredAddressFields.filter(f => !delivery_address[f]);
+      if (missingFields.length > 0) {
+        return new Response(
+          JSON.stringify({ error: `Missing address fields: ${missingFields.join(', ')}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    // Calculate totals with Shopify-level product validation
     let subtotal_cents = 0;
     const orderItems = [];
+    const inventoryReservations = [];
 
     for (const item of items) {
+      // Look up product in unified products table with Shopify-level validation
       const { data: product, error: productError } = await supabaseAdmin
         .from('products')
-        .select('id, name, base_price_cents, description')
+        .select('id, name, name_fr, name_en, base_price_cents, description, description_fr, description_en, status, visibility, track_quantity, quantity, reserved_quantity, allow_overselling')
         .eq('id', item.product_id)
         .eq('workspace_id', workspace.id)
         .single();
@@ -127,6 +141,34 @@ serve(async (req) => {
           JSON.stringify({ error: `Product not found: ${item.product_id}` }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Shopify-level validation: Check product is active and visible
+      if (product.status !== 'active') {
+        return new Response(
+          JSON.stringify({ error: `Product "${product.name}" is not available for sale (status: ${product.status})` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      if (product.visibility !== 'public' && product.visibility !== 'unlisted') {
+        return new Response(
+          JSON.stringify({ error: `Product "${product.name}" is not available for sale` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Shopify-level validation: Check inventory if tracked
+      if (product.track_quantity) {
+        const availableQty = product.quantity - product.reserved_quantity;
+        if (availableQty < item.quantity && !product.allow_overselling) {
+          return new Response(
+            JSON.stringify({ 
+              error: `Insufficient stock for "${product.name}". Available: ${availableQty}, Requested: ${item.quantity}` 
+            }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
 
       const quantity = item.quantity || 1;
@@ -143,6 +185,14 @@ serve(async (req) => {
         quantity: quantity,
         line_total_cents: line_total,
       });
+
+      // Track inventory reservations for tracked products
+      if (product.track_quantity) {
+        inventoryReservations.push({
+          product_id: product.id,
+          quantity: quantity
+        });
+      }
     }
 
     // Calculate fees
@@ -192,6 +242,23 @@ serve(async (req) => {
         JSON.stringify({ error: 'Failed to create order', details: orderError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Reserve inventory for tracked products (Shopify-level inventory management)
+    for (const reservation of inventoryReservations) {
+      try {
+        const { error: reserveError } = await supabaseAdmin.rpc('reserve_inventory', {
+          p_product_id: reservation.product_id,
+          p_quantity: reservation.quantity,
+          p_order_id: order.id
+        });
+        if (reserveError) {
+          console.error('Failed to reserve inventory for product', reservation.product_id, reserveError);
+        }
+      } catch (invError) {
+        console.error('Failed to reserve inventory:', invError);
+        // Don't fail the order, but log it
+      }
     }
 
     // Create order items
